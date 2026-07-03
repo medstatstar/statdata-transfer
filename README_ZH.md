@@ -1,11 +1,17 @@
 # statdata-transfer | 统计数据格式转换器
 
+[🇬🇧 English](./README.md)
+
+---
+
 读入 28+ 统计软件及临床试验数据格式（CDISC ODM/EpiData/EpiInfo/Excel/EViews/Feather/FST/GraphPad Prism/Gretl/HDF5/HTML/jamovi/JMP/JSON/MATLAB/Minitab/ODS/ORC/Parquet/R/SAS/SPSS/Stata/Weka ARFF/XML），转换为 Python/pandas DataFrame，并在不同格式之间**双向转换**，100% 保留变量标签、值标签等元数据。
+
+注意：本技能不需要任何统计软件的支持，但功能仅限于数据格式转换。如果需要**AI智能体接入并无缝调用已安装的各种统计软件的分析功能，**，强烈建议使用技能 **statsoft-cli**。该技能专为AI智能体无缝集成统计软件设计。
 
 ## 核心能力
 
 ### 读入（数据提取）
-从 28+ 统计软件格式中提取数据 + 元数据（变量标签、值标签、特殊缺失值…等全部元数据），转为 pandas DataFrame。SPSS/Stata/SAS 完整保留全部元数据，其他格式明确标注保留/丢失情况。
+从 28+ 统计软件格式中提取数据 + 元数据（变量标签、值标签、特殊缺失值…等全部元数据），转为 pandas DataFrame+作为中间格式，尽可能完整保留元数据，并明确标注保留/丢失情况。
 
 ### 转存（格式转换）
 将读入结果写出为任意其他格式：

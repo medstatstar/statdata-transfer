@@ -12,12 +12,11 @@ triggers:
   - "metadata-preserved conversion"
 metadata:
   {
-    "openclaw": { "emoji": "🛠️"},
+    "openclaw": { "emoji": "🛠️", "icon": "assets/icon.svg"},
     "authors": ["medstatstar", "phoe-zip"],
     "version": "1.7.0",
     "license": "MIT",
     "tags": ["data-conversion", "statistics", "spss", "stata", "sas", "clinical-trials", "metadata", "pandas", "bidirectional"],
-    "logo": "assets/logo.svg",
     "homepage": "https://github.com/medstatstar/statdata-transfer",
   }
 ---

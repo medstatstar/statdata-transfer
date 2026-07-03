@@ -1,13 +1,17 @@
 # statdata-transfer | Statistical Data Format Converter
 
+[🇨🇳 中文 (Chinese)](./README_zh.md) | [🇬🇧 English](./README.md)
+
+---
+
 Read 28+ statistical software and clinical trial data formats (CDISC ODM/EpiData/EpiInfo/Excel/EViews/Feather/FST/GraphPad Prism/Gretl/HDF5/HTML/jamovi/JMP/JSON/MATLAB/Minitab/ODS/ORC/Parquet/R/SAS/SPSS/Stata/Weka ARFF/XML) into Python/pandas DataFrame, and **convert between formats bidirectionally**, preserving 100% of retainable metadata.
 
-**中文文档 | Chinese docs**: [README_ZH.md](README_ZH.md)
+Note: This skill does not require any statistical software to be installed, but its functionality is limited to data format conversion only. If you need **an AI agent to seamlessly integrate with and invoke the analysis capabilities of various installed statistical software**, it is strongly recommended to use the **statsoft-cli** skill, which is specifically designed for AI agents to seamlessly integrate statistical software.
 
 ## Core Capabilities
 
 ### Read (Data Extraction)
-Extract data + metadata from 28+ statistical formats into pandas DataFrame. SPSS/Stata/SAS preserve all metadata types; other formats clearly document what is preserved vs lost.
+Extract data + metadata from 28+ statistical formats into pandas DataFrame, using it as an intermediate format to preserve metadata as completely as possible, and clearly indicate what is preserved vs lost. SPSS/Stata/SAS preserve all metadata types.
 
 ### Write / Convert (Format Conversion)
 Convert read results to any other format:
