@@ -20,3 +20,9 @@ generate_handlers.py
 
 # pytest 缓存
 .pytest_cache/
+
+# Git 仓库
+.git/
+
+# 打包产物
+statdata-transfer.zip

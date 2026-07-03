@@ -87,6 +87,4 @@
   </g>
   
   <!-- Title -->
-  <text x="340" y="580" text-anchor="middle" fill="#3C3489" font-size="32" font-weight="bold">statdata-transfer</text>
-  <text x="340" y="620" text-anchor="middle" fill="#5F5E5A" font-size="18">双向格式转换 · 完整元数据保留</text>
 </svg>
