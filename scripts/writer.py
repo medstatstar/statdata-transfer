@@ -1,0 +1,733 @@
+"""
+writer.py - 数据导出模块
+将 DataFrame + 元数据转写为各类统计/数据格式
+
+支持的格式：SPSS (.sav/.zsav), Stata (.dta), R (.rda/.rds), Excel (.xlsx/.xls),
+SAS XPT (.xpt), CSV (.csv), TSV (.tsv), Parquet (.parquet), HDF5 (.h5/.hdf5),
+JSON (.json), Feather (.feather)
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+import tempfile
+from typing import Any
+
+import pandas as pd
+import pyarrow as pa
+
+from .reader_core import _bilingual
+
+
+# ============================================================
+# 辅助函数
+# ============================================================
+
+def _get_variable_labels(metadata: dict) -> dict[str, str]:
+    if not metadata:
+        return {}
+    return metadata.get("variable_labels", {})
+
+
+def _get_value_labels(metadata: dict) -> dict[str, dict]:
+    if not metadata:
+        return {}
+    return metadata.get("value_labels", {})
+
+
+def _get_missing_ranges(metadata: dict) -> dict:
+    """提取 missing_ranges 元数据，转换为 write_sav 格式。
+    
+    返回格式：{"varname": [{"lo": x, "hi": y}]}
+    """
+    if not metadata:
+        return {}
+    ranges = metadata.get("missing_ranges", {})
+    if not isinstance(ranges, dict):
+        return {}
+    return {k: v for k, v in ranges.items() if isinstance(v, list) and v}
+
+
+def _get_missing_user_values(metadata: dict) -> dict:
+    """提取 missing_user_values 元数据。
+    
+    对于 Stata：应是 {"varname": ["a", "b", "c"]}（小写字母列表）
+    对于 SPSS：应是 {"varname": [-99, -98]}
+    """
+    if not metadata:
+        return {}
+    vals = metadata.get("missing_user_values", {})
+    if not isinstance(vals, dict):
+        return {}
+    return {k: v for k, v in vals.items() if isinstance(v, (list, tuple))}
+
+
+def _build_full_meta(metadata: dict) -> dict:
+    """从 metadata dict 中提取全部 17 个核心字段，用于嵌入到非统计格式中"""
+    if not metadata:
+        return {}
+    
+    fields = [
+        "variable_labels", "value_labels", "special_missing",
+        "variable_display_width", "variable_storage_width",
+        "variable_measure", "variable_alignment",
+        "missing_ranges", "missing_user_values",
+        "date_origin", "file_encoding", "file_label",
+        "creation_time", "notes", "original_variable_types",
+        "column_names_to_labels", "mr_sets",
+    ]
+    full_meta = {}
+    for field in fields:
+        val = metadata.get(field)
+        if val:  # 只保存非空字段
+            full_meta[field] = val
+    return full_meta
+
+
+# 核心字段名常量（供 reader 端解析）
+STAT_FULL_META_KEY = "stat-full-meta"  # 单一 key 存储全部 17 个字段的 JSON
+STAT_META_VERSION = "1.0"
+
+
+def _pyreadstat_value_labels(val_labels: dict, columns: list) -> dict | None:
+    """将值标签转换为 pyreadstat 接受的格式 {varname: {value: label}}"""
+    result = {}
+    for varname, labels_dict in val_labels.items():
+        if varname in columns:
+            lab_dict = {}
+            for val, lab in labels_dict.items():
+                if isinstance(val, str) and not val.startswith("_"):
+                    try:
+                        val = int(val)
+                    except ValueError:
+                        try:
+                            val = float(val)
+                        except ValueError:
+                            continue
+                if isinstance(val, (int, float)):
+                    lab_dict[val] = str(lab)
+            if lab_dict:
+                result[varname] = lab_dict
+    return result if result else None
+
+
+def _try_stata_version(version: int) -> int:
+    """检查 pyreadstat 是否支持指定的 Stata 版本"""
+    try:
+        import pyreadstat
+        # pyreadstat 1.3.5 支持版本 13, 14, 15
+        supported = [13, 14, 15]
+        if version in supported:
+            return version
+        return 15
+    except Exception:
+        return 15
+
+
+# ============================================================
+# SPSS .sav 写入
+# ============================================================
+
+def _check_non_stat_target_loss(metadata):
+    """Check metadata loss when writing to non-statistical formats | 检查写出到非统计格式时的元数据丢失"""
+    warnings = []
+    if metadata.get("special_missing"):
+        warnings.append(f"目标格式不保存 special_missing | Target format does not save special_missing ({len(metadata['special_missing'])} vars lost)")
+    if metadata.get("variable_display_width"):
+        non_empty = {k:v for k,v in metadata["variable_display_width"].items() if v}
+        if non_empty:
+            warnings.append(f"目标格式不保存 variable_display_width | Target format does not save variable_display_width ({len(non_empty)} vars lost)")
+    if metadata.get("variable_storage_width"):
+        non_empty = {k:v for k,v in metadata["variable_storage_width"].items() if v}
+        if non_empty:
+            warnings.append(f"目标格式不保存 variable_storage_width | Target format does not save variable_storage_width ({len(non_empty)} vars lost)")
+    if metadata.get("variable_measure"):
+        non_empty = {k:v for k,v in metadata["variable_measure"].items() if v}
+        if non_empty:
+            warnings.append(f"目标格式不保存 variable_measure | Target format does not save variable_measure ({len(non_empty)} vars lost)")
+    if metadata.get("variable_alignment"):
+        non_empty = {k:v for k,v in metadata["variable_alignment"].items() if v}
+        if non_empty:
+            warnings.append(f"目标格式不保存 variable_alignment | Target format does not save variable_alignment ({len(non_empty)} vars lost)")
+    if metadata.get("missing_ranges"):
+        warnings.append(f"目标格式不保存 missing_ranges | Target format does not save missing_ranges ({len(metadata['missing_ranges'])} vars lost)")
+    if metadata.get("missing_user_values"):
+        warnings.append(f"目标格式不保存 missing_user_values | Target format does not save missing_user_values ({len(metadata['missing_user_values'])} vars lost)")
+    if metadata.get("mr_sets"):
+        warnings.append(f"目标格式不保存 mr_sets | Target format does not save mr_sets ({len(metadata['mr_sets'])} sets lost)")
+    if metadata.get("date_origin"):
+        warnings.append(f"目标格式不保存 date_origin | Target format does not save date_origin (date baseline lost)")
+    if metadata.get("file_encoding"):
+        warnings.append(f"目标格式不保存 file_encoding | Target format does not save file_encoding")
+    if metadata.get("file_label"):
+        warnings.append(f"目标格式不保存 file_label | Target format does not save file_label")
+    if metadata.get("notes"):
+        non_empty = [n for n in metadata["notes"] if n]
+        if non_empty:
+            warnings.append(f"目标格式不保存 notes | Target format does not save notes ({len(non_empty)} notes lost)")
+    if metadata.get("original_variable_types"):
+        non_empty = {k:v for k,v in metadata["original_variable_types"].items() if v}
+        if non_empty:
+            warnings.append(f"目标格式不保存 original_variable_types | Target format does not save original_variable_types ({len(non_empty)} vars lost)")
+    return warnings
+
+
+def _write_sav(df, filepath, metadata=None, *, compress_zsav=False):
+    """写入 SPSS .sav / .zsav 格式
+    
+    pyreadstat 1.3.5 write_sav 支持 missing_ranges 参数。
+    SPSS 用户自定义缺失值通过 missing_ranges 写出。
+    """
+    import pyreadstat
+    
+    var_labels = _get_variable_labels(metadata)
+    val_labels = _get_value_labels(metadata)
+    
+    column_labels = [var_labels.get(col, col) for col in df.columns]
+    variable_value_labels = _pyreadstat_value_labels(val_labels, list(df.columns))
+    file_label = metadata.get("file_label", "") if metadata else ""
+    
+    # 提取缺失值范围（SPSS 使用 missing_ranges 参数）
+    missing_ranges = _get_missing_ranges(metadata)
+    
+    kwargs_write = dict(
+        column_labels=column_labels,
+        variable_value_labels=variable_value_labels,
+        file_label=file_label if file_label else None,
+    )
+    
+    if missing_ranges:
+        kwargs_write["missing_ranges"] = missing_ranges
+    
+    # pyreadstat 1.3.5 不支持 write_zsav / read_zsav，降级为 .sav
+    if compress_zsav:
+        try:
+            if hasattr(pyreadstat, 'write_zsav'):
+                write_fn = pyreadstat.write_zsav
+            else:
+                compress_zsav = False
+                write_fn = pyreadstat.write_sav
+        except Exception:
+            compress_zsav = False
+            write_fn = pyreadstat.write_sav
+    else:
+        write_fn = pyreadstat.write_sav
+    
+    write_fn(
+        df, filepath,
+        **kwargs_write,
+    )
+
+
+# ============================================================
+# Stata .dta 写入
+# ============================================================
+
+def _write_stata(df, filepath, metadata=None, *, version=15):
+    """写入 Stata .dta 格式
+    
+    支持的元数据参数：
+    - missing_user_values: {"varname": ["a", "b"]}（小写字母）
+    - missing_ranges: {"varname": [{"lo": x, "hi": y}]}
+    """
+    import pyreadstat
+    
+    # 调整版本
+    version = _try_stata_version(version)
+    
+    var_labels = _get_variable_labels(metadata)
+    val_labels = _get_value_labels(metadata)
+    
+    column_labels = [var_labels.get(col, col) for col in df.columns]
+    variable_value_labels = _pyreadstat_value_labels(val_labels, list(df.columns))
+    file_label = metadata.get("file_label", "") if metadata else ""
+    if file_label and len(file_label) > 80:
+        file_label = file_label[:80]
+    
+    # 恢复 Stata 特殊缺失值定义
+    missing_user_values = _get_missing_user_values(metadata)
+    
+    # 从 DataFrame 自动检测字符 'a'-'z' 标签
+    if not missing_user_values:
+        missing_user_values = {}
+    
+    for col in df.columns:
+        if df[col].dtype == object:
+            char_tags = set()
+            for val in df[col].dropna():
+                if isinstance(val, str) and len(val) == 1 and 'a' <= val <= 'z':
+                    char_tags.add(val)
+            if char_tags:
+                existing = set(missing_user_values.get(col, []))
+                missing_user_values[col] = sorted(existing | char_tags)
+    
+    kwargs_write = dict(
+        version=version,
+        column_labels=column_labels,
+        variable_value_labels=variable_value_labels,
+        file_label=file_label if file_label else None,
+    )
+    
+    if missing_user_values:
+        kwargs_write["missing_user_values"] = missing_user_values
+    
+    pyreadstat.write_dta(
+        df, filepath,
+        **kwargs_write,
+    )
+
+
+# ============================================================
+# R .rda / .rds 写入（通过 R subprocess）
+# ============================================================
+
+def _write_r_via_subprocess(df, filepath, metadata=None, object_name="df", save_func="save"):
+    """通过 R subprocess 写入 R 格式文件，并将全部 17 个元数据字段保存为 R 数据属性"""
+    from .reader_r import _check_r_available
+    
+    r_exe = _check_r_available()
+    if not r_exe:
+        raise RuntimeError(_bilingual("R 未安装，无法写入 R 格式文件。请先配置 R 环境。", "R is not installed, cannot write R format file. Please configure R environment first."))
+    
+    filepath_fwd = filepath.replace("\\", "/")
+    tmp_csv = tempfile.NamedTemporaryFile(suffix='.csv', delete=False, mode='w', encoding='utf-8')
+    tmp_csv.close()
+    r_script_file = None
+    
+    try:
+        df.to_csv(tmp_csv.name, index=False, encoding='utf-8')
+        csv_fwd = tmp_csv.name.replace("\\", "/")
+        
+        orig_cols = list(df.columns)
+        var_labels = _get_variable_labels(metadata)
+        val_labels = _get_value_labels(metadata)
+
+        full_meta = _build_full_meta(metadata)
+        
+        r_lines = [
+            "options(encoding='UTF-8')",
+            f"df <- read.csv('{csv_fwd}', stringsAsFactors=FALSE, fileEncoding='UTF-8')",
+        ]
+        
+        # 跳过自动修改列名：保持原列名
+        make_names_orig = []
+        for col in orig_cols:
+            if col != col.strip():
+                make_names_orig.append(col)
+        
+        # 赋值标签到每列
+        for col, lab in var_labels.items():
+            if col in orig_cols:
+                lab_esc = lab.replace("\\", "\\\\").replace('"', '\\"').replace("\n", " ")
+                r_lines.append(f'attr(df[["{col}"]], "label") <- "{lab_esc}"')
+        
+        # 值标签
+        for col, labels_dict in val_labels.items():
+            if col in orig_cols:
+                int_items = []
+                for v, l in labels_dict.items():
+                    if isinstance(v, (int, float)):
+                        l_esc = str(l).replace('"', '\\"')
+                        int_items.append(f'`{int(v)}` = "{l_esc}"')
+                if int_items:
+                    r_lines.append(f'attr(df[["{col}"]], "labels") <- c({", ".join(int_items)})')
+                    r_lines.append(f'class(df[["{col}"]]) <- c("labelled", "integer")')
+        
+        # 保存 all 17 metadata fields as JSON in dataframe attributes
+        if full_meta:
+            meta_json_str = json.dumps(full_meta, ensure_ascii=False).replace("\\", "\\\\").replace('"', '\\"')
+            r_lines.append(f'attr(df, "statdata_meta") <- "{meta_json_str}"')
+        
+        # 保存
+        if save_func == "saveRDS":
+            r_lines.append(f"saveRDS(df, '{filepath_fwd}')")
+        else:
+            r_lines.append(f"save(df, file='{filepath_fwd}')")
+        
+        r_script = "\n".join(r_lines)
+        
+        r_script_file = tempfile.NamedTemporaryFile(mode='w', suffix='.R', delete=False, encoding='utf-8')
+        r_script_file.write(r_script)
+        r_script_file.close()
+        
+        result = subprocess.run([r_exe, r_script_file.name], capture_output=True, text=True, timeout=120)
+        
+        if result.returncode != 0:
+            err = result.stderr.strip()
+            if "Execution halted" in err or "Error" in err.split("\n")[-1]:
+                raise RuntimeError(_bilingual(f"R 写入失败: {err}", f"R write failed: {err}"))
+    
+    except Exception as e:
+        if isinstance(e, RuntimeError):
+            raise
+        raise RuntimeError(_bilingual(f"R 写入失败: {e}", f"R write failed: {e}"))
+    
+    finally:
+        if r_script_file and os.path.exists(r_script_file.name):
+            os.unlink(r_script_file.name)
+        if os.path.exists(tmp_csv.name):
+            os.unlink(tmp_csv.name)
+
+
+def _write_rda(df, filepath, metadata=None, *, object_name="df"):
+    """写入 R .rda 格式"""
+    _write_r_via_subprocess(df, filepath, metadata, object_name, "save")
+
+
+def _write_rds(df, filepath, metadata=None):
+    """写入 R .rds 格式"""
+    _write_r_via_subprocess(df, filepath, metadata, "df", "saveRDS")
+
+
+# ============================================================
+# Excel .xlsx 写入
+# ============================================================
+
+def _write_excel(df, filepath, metadata=None, *, engine="openpyxl"):
+    """写入 Excel 并附加标签工作表，返回元数据丢失警告"""
+    warnings = []
+    
+    # Excel 需要检查是否有丢失的元数据
+    if metadata:
+        lost_fields = _check_excel_metadata_loss(metadata)
+        warnings.extend(lost_fields)
+    
+    with pd.ExcelWriter(filepath, engine=engine) as writer:
+        df.to_excel(writer, index=False, sheet_name="Data")
+        
+        if metadata:
+            var_labels = _get_variable_labels(metadata)
+            val_labels = _get_value_labels(metadata)
+            
+            meta_rows = []
+            for col in df.columns:
+                meta_rows.append({"Column": col, "Label": var_labels.get(col, "")})
+            if meta_rows:
+                pd.DataFrame(meta_rows).to_excel(writer, index=False, sheet_name="_col_labels")
+            
+            vl_rows = []
+            for var, labels_dict in val_labels.items():
+                for val, lab in labels_dict.items():
+                    vl_rows.append({"Variable": var, "Value": val, "Label": lab})
+            if vl_rows:
+                pd.DataFrame(vl_rows).to_excel(writer, index=False, sheet_name="_val_labels")
+    
+    return warnings
+
+
+def _check_excel_metadata_loss(metadata):
+    """检查哪些 Excel 格式无法保存"""
+    warnings = []
+    if metadata.get("special_missing"):
+        warnings.append(f"Excel 不保存 special_missing（{len(metadata['special_missing'])} 个变量丢失） | Excel does not save special_missing ({len(metadata['special_missing'])} vars lost)")
+    if metadata.get("variable_display_width"):
+        non_empty = {k:v for k,v in metadata["variable_display_width"].items() if v}
+        if non_empty:
+            warnings.append(f"Excel 不保存 variable_display_width（{len(non_empty)} 个变量丢失） | Excel does not save variable_display_width ({len(non_empty)} vars lost)")
+    if metadata.get("variable_measure"):
+        non_empty = {k:v for k,v in metadata["variable_measure"].items() if v}
+        if non_empty:
+            warnings.append(f"Excel 不保存 variable_measure（{len(non_empty)} 个变量丢失） | Excel does not save variable_measure ({len(non_empty)} vars lost)")
+    if metadata.get("variable_alignment"):
+        non_empty = {k:v for k,v in metadata["variable_alignment"].items() if v}
+        if non_empty:
+            warnings.append(f"Excel 不保存 variable_alignment（{len(non_empty)} 个变量丢失） | Excel does not save variable_alignment ({len(non_empty)} vars lost)")
+    return warnings
+
+
+def _write_xls(df, filepath, metadata=None):
+    """写入旧版 Excel .xls（最多 65536 行）"""
+    _write_excel(df, filepath, metadata, engine="xlwt")
+
+
+# ============================================================
+# SAS XPT 写入
+# ============================================================
+
+def _write_xpt(df, filepath, metadata=None):
+    """写入 SAS XPORT (.xpt) 格式
+    
+    注意：XPT 格式不支持 special_missing 和 mr_sets，写出时会丢失。
+    这些元数据会被保存到 17 字段的嵌入 JSON 中供读入追溯。
+    """
+    import pyreadstat
+    
+    var_labels = _get_variable_labels(metadata)
+    column_labels = [var_labels.get(col, col)[:40] for col in df.columns]
+    pyreadstat.write_xport(df, filepath, column_labels=column_labels)
+
+
+# ============================================================
+# CSV / TSV 写入
+# ============================================================
+
+def _write_csv(df, filepath, metadata=None, *, encoding="utf-8-sig"):
+    """写入 CSV 格式，附加全部 17 个元数据字段到 _metadata.json"""
+    df.to_csv(filepath, index=False, encoding=encoding)
+    
+    if metadata:
+        base, _ = os.path.splitext(filepath)
+        meta_file = base + "_metadata.json"
+        full_meta = _build_full_meta(metadata)
+        if full_meta:
+            full_meta["source_format"] = metadata.get("file_format", "unknown")
+            with open(meta_file, 'w', encoding='utf-8') as f:
+                json.dump(full_meta, f, ensure_ascii=False, indent=2)
+
+
+def _write_tsv(df, filepath, metadata=None, *, encoding="utf-8-sig"):
+    """写入 TSV 格式，附加全部 17 个元数据字段到 _metadata.json"""
+    df.to_csv(filepath, index=False, sep='\t', encoding=encoding)
+    
+    if metadata:
+        base, _ = os.path.splitext(filepath)
+        meta_file = base + "_metadata.json"
+        full_meta = _build_full_meta(metadata)
+        if full_meta:
+            full_meta["source_format"] = metadata.get("file_format", "unknown")
+            with open(meta_file, 'w', encoding='utf-8') as f:
+                json.dump(full_meta, f, ensure_ascii=False, indent=2)
+
+
+# ============================================================
+# Parquet 写入
+# ============================================================
+
+def _write_parquet(df, filepath, metadata=None):
+    """
+    写入 Parquet 格式，将全部 17 个元数据字段嵌入 schema.metadata
+    可通过 read_stat_file() 无损还原
+    """
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+    
+    table = pa.Table.from_pandas(df)
+    
+    if metadata:
+        full_meta = _build_full_meta(metadata)
+        if full_meta:
+            embed = {b"stat-full-meta": json.dumps(full_meta, ensure_ascii=False).encode("utf-8")}
+            # 保留原有的 pandas schema metadata
+            existing = dict(table.schema.metadata) if table.schema.metadata else {}
+            existing.update(embed)
+            new_schema = table.schema.with_metadata(existing)
+            table = table.cast(new_schema)
+    
+    pq.write_table(table, filepath)
+
+
+# ============================================================
+# Feather 写入
+# ============================================================
+
+def _write_feather(df, filepath, metadata=None):
+    """写入 Feather 格式，将全部 17 个元数据字段嵌入 schema.metadata"""
+    import pyarrow.feather as ft
+    
+    table = pa.Table.from_pandas(df)
+    
+    if metadata:
+        full_meta = _build_full_meta(metadata)
+        if full_meta:
+            embed = {b"stat-full-meta": json.dumps(full_meta, ensure_ascii=False).encode("utf-8")}
+            existing = dict(table.schema.metadata) if table.schema.metadata else {}
+            existing.update(embed)
+            new_schema = table.schema.with_metadata(existing)
+            table = table.cast(new_schema)
+    
+    ft.write_feather(table, filepath)
+
+
+# ============================================================
+# HDF5 写入
+# ============================================================
+
+def _write_hdf5(df, filepath, metadata=None, *, key="data"):
+    """写入 HDF5 格式，将全部 17 个元数据字段打包为 JSON 字符串存在根属性中"""
+    import h5py
+    
+    df.to_hdf(filepath, key=key, mode='w', format='table', index=False)
+    
+    if metadata:
+        full_meta = _build_full_meta(metadata)
+        if full_meta:
+            with h5py.File(filepath, 'a') as f:
+                f.attrs[STAT_FULL_META_KEY] = json.dumps(full_meta, ensure_ascii=False)
+
+
+# ============================================================
+# JSON 写入
+# ============================================================
+
+def _write_json(df, filepath, metadata=None, *, orient="records"):
+    """写入 JSON 格式，使用 meta+data 包裹结构保留全部 17 个元数据字段"""
+    output = {"data": json.loads(df.to_json(orient=orient, date_format="iso"))}
+    
+    if metadata:
+        full_meta = _build_full_meta(metadata)
+        if full_meta:
+            output["meta"] = full_meta
+    
+    with open(filepath, 'w', encoding='utf-8') as f:
+        json.dump(output, f, ensure_ascii=False, indent=2)
+
+
+# ============================================================
+# 统一写入入口
+# ============================================================
+
+_SUPPORT_WRITERS = {
+    ".sav": _write_sav,
+    ".zsav": _write_sav,
+    ".dta": _write_stata,
+    ".rda": _write_rda,
+    ".rds": _write_rds,
+    ".xlsx": _write_excel,
+    ".xls": _write_xls,
+    ".xpt": _write_xpt,
+    ".csv": _write_csv,
+    ".tsv": _write_tsv,
+    ".parquet": _write_parquet,
+    ".feather": _write_feather,
+    ".h5": _write_hdf5,
+    ".hdf5": _write_hdf5,
+    ".json": _write_json,
+}
+
+
+def write_stat_file(dataframe, filepath, metadata=None, **kwargs):
+    """
+    将 DataFrame 写入指定格式的文件
+    
+    Parameters
+    ----------
+    dataframe : pd.DataFrame
+    filepath : str（目标路径，扩展名决定格式，如 .dta / .sav / .xlsx / .csv / .rda 等）
+    metadata : dict, optional（含 variable_labels / value_labels 的元数据字典）
+    **kwargs
+        传递给底层写入函数的额外参数
+        
+    Raises
+    ------
+    ValueError
+        目标格式不支持
+    RuntimeError
+        写入失败
+    
+    Warns
+    -----
+    warnings : list
+        元数据丢失警告列表，可通过 result['warnings'] 获取
+    """
+    ext = os.path.splitext(filepath)[1].lower()
+    
+    if ext not in _SUPPORT_WRITERS:
+        supported = ", ".join(sorted(_SUPPORT_WRITERS.keys()))
+        raise ValueError(_bilingual(f"不支持的写入格式: {ext}\\n支持的格式: {supported}", f"Unsupported write format: {ext}\\nSupported formats: {supported}"))
+    
+    writer_func = _SUPPORT_WRITERS[ext]
+    
+    out_dir = os.path.dirname(filepath)
+    if out_dir:
+        os.makedirs(out_dir, exist_ok=True)
+    
+    # 传递 compress_zsav 参数给 zsav
+    if ext == ".zsav":
+        kwargs["compress_zsav"] = True
+    
+    # 对于非统计软件格式，检查元数据丢失
+    warnings = []
+    if metadata and ext in {".parquet", ".feather", ".orc", ".fst", ".hdf5", ".json", ".xlsx", ".xls", ".csv", ".tsv"}:
+        warnings = _check_non_stat_target_loss(metadata)
+    
+    writer_func(dataframe, filepath, metadata or {}, **kwargs)
+    
+    return warnings
+
+
+def supported_write_formats():
+    """返回支持的写入格式扩展名列表"""
+    return sorted(_SUPPORT_WRITERS.keys())
+
+
+def can_preserve_labels(ext):
+    """判断指定格式是否能在原生层面保留值和变量标签"""
+    return ext.lower() in {".sav", ".zsav", ".dta", ".rda", ".rds", ".xpt"}
+
+
+def conversion_has_metadata_loss(src_ext, dst_ext):
+    """判断从源格式转为目标格式是否有元数据丢失风险 | Check metadata loss risk in conversion."""
+    src_labels = src_ext.lower() in {".sav", ".zsav", ".dta", ".rda", ".rds", ".por", ".sas7bdat", ".xpt"}
+    dst_labels = dst_ext.lower() in {".sav", ".zsav", ".dta", ".rda", ".rds", ".xpt"}
+    
+    if src_labels and not dst_labels:
+        return (
+            f"源格式 {src_ext} 含有变量/值标签 → {dst_ext} 无法保存 | "
+            f"Source {src_ext} has variable/value labels → {dst_ext} cannot save them. "
+            f"额外生成 _metadata.json | Extra _metadata.json will be generated."
+        )
+    return None
+
+
+# ============================================================
+# 格式转换入口
+# ============================================================
+
+def convert_stat_file(src_path, dst_path, *, metadata=None, **kwargs):
+    """
+    读入源文件 + 转写目标格式
+    
+    Parameters
+    ----------
+    src_path : str（源文件路径）
+    dst_path : str（目标文件路径）
+    metadata : dict, optional（提供则跳过源文件读入元数据）
+    **kwargs
+        传递给 write_stat_file 的参数
+    
+    Returns
+    -------
+    dict
+        {"src_format", "dst_format", "rows", "columns", "warnings"}
+    """
+    from .reader_core import read_stat_file
+    
+    result = {
+        "src_format": "unknown",
+        "dst_format": "unknown",
+        "rows": 0,
+        "columns": 0,
+        "warnings": [],
+    }
+    
+    if metadata is None:
+        src_result = read_stat_file(src_path)
+        metadata = src_result["metadata"]
+        dataframe = src_result["dataframe"]
+        result["src_format"] = metadata.get("file_format", "unknown")
+        result["warnings"].extend(src_result.get("warnings", []))
+    else:
+        src_result = read_stat_file(src_path)
+        dataframe = src_result["dataframe"]
+        result["src_format"] = src_result["metadata"].get("file_format", "unknown")
+    
+    src_ext = "." + src_path.rsplit(".", 1)[-1].lower() if "." in src_path else ""
+    dst_ext = "." + dst_path.rsplit(".", 1)[-1].lower() if "." in dst_path else ""
+    
+    loss_warning = conversion_has_metadata_loss(src_ext, dst_ext)
+    if loss_warning:
+        result["warnings"].append(loss_warning)
+    
+    write_warnings = write_stat_file(dataframe, dst_path, metadata, **kwargs)
+    result["warnings"].extend(write_warnings)
+    
+    result["dst_format"] = dst_ext
+    result["rows"] = len(dataframe)
+    result["columns"] = len(dataframe.columns)
+    
+    return result
+
+
+supported_output_formats = supported_write_formats

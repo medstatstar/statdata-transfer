@@ -1,0 +1,20 @@
+{
+  "source_format": "unknown",
+  "variable_labels": {
+    "a": "Variable A",
+    "b": "Variable B"
+  },
+  "value_labels": {
+    "a": {
+      "1": "One",
+      "2": "Two",
+      "3": "Three"
+    }
+  },
+  "special_missing": {
+    "a": {
+      "low": 99,
+      "high": 100
+    }
+  }
+}

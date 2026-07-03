@@ -1,0 +1,29 @@
+{
+  "data": [
+    {
+      "a": 1,
+      "b": "x"
+    },
+    {
+      "a": 2,
+      "b": "y"
+    },
+    {
+      "a": 3,
+      "b": "z"
+    }
+  ],
+  "meta": {
+    "variable_labels": {
+      "a": "Variable A",
+      "b": "Variable B"
+    },
+    "value_labels": {
+      "a": {
+        "1": "One",
+        "2": "Two",
+        "3": "Three"
+      }
+    }
+  }
+}

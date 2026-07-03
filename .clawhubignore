@@ -1,0 +1,22 @@
+# Python 缓存
+__pycache__/
+*.pyc
+*.pyo
+
+# 备份文件
+*.bak
+
+# 测试/临时文件
+test_*.py
+test_*.xlsx
+test_*.sav
+test_*.dta
+test_data/
+_tmp_*
+
+# 生成脚本（内部工具，不需要发布）
+split_reader.py
+generate_handlers.py
+
+# pytest 缓存
+.pytest_cache/
