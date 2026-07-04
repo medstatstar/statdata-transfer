@@ -1,7 +1,7 @@
 ---
 name: statdata-transfer
 cn_name: 统计数据格式转换器 
-description: "将 28+ 统计软件格式读入 pandas DataFrame，完整保留全部元数据；支持任意双向转换。Read 28+ stats formats into pandas with full metadata; bidirectional conversion. See README.md / README_ZH.md for details."
+description: "读入 28+ 统计软件格式，100% 保留变量标签/值标签/缺失值等全部元数据；支持任意格式互转（SPSS↔Stata↔R↔SAS↔Excel↔Parquet↔HDF5↔JSON…），双向无损。Read 28+ stats formats with full metadata; bidirectionally convert between any formats (SPSS↔Stata↔R↔SAS↔Excel↔Parquet…). See README.md / README_ZH.md for details."
 triggers:
   - "statdata-transfer"
   - "统计数据格式转换"

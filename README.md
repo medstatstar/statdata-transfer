@@ -4,7 +4,7 @@
 
 ---
 
-Read 28+ statistical software and clinical trial data formats (CDISC ODM/EpiData/EpiInfo/Excel/EViews/Feather/FST/GraphPad Prism/Gretl/HDF5/HTML/jamovi/JMP/JSON/MATLAB/Minitab/ODS/ORC/Parquet/R/SAS/SPSS/Stata/Weka ARFF/XML) into Python/pandas DataFrame, and **convert between formats bidirectionally**, preserving 100% of retainable metadata.
+Read 28+ statistical software and clinical trial data formats (CDISC ODM/EpiData/EpiInfo/Excel/EViews/Feather/FST/GraphPad Prism/Gretl/HDF5/HTML/jamovi/JMP/JSON/MATLAB/Minitab/ODS/ORC/Parquet/R/SAS/SPSS/Stata/Weka ARFF/XML) into Python/pandas DataFrame, and **bidirectionally convert between any formats** (SPSS↔Stata↔R↔SAS↔Excel↔Parquet↔HDF5↔JSON…), preserving 100% of retainable metadata.
 
 Note: This skill does not require any statistical software to be installed, but its functionality is limited to data format conversion only. If you need **an AI agent to seamlessly integrate with and invoke the analysis capabilities of various installed statistical software**, it is strongly recommended to use the **statsoft-cli** skill, which is specifically designed for AI agents to seamlessly integrate statistical software.
 
