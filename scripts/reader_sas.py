@@ -32,6 +32,11 @@ def _read_sas(filepath, timestamp, *, format_type, user_missing=True, encoding) 
     """Read SAS file (.sas7bdat / .xpt / .sd2)."""
     warnings_list = []
 
+    # Auto-detect encoding if user didn't specify one
+    if encoding is None:
+        from .reader_core import _auto_detect_encoding
+        encoding = _auto_detect_encoding(filepath)
+
     if format_type == "sas_xpt":
         read_kwargs = {"dates_as_pandas_datetime": True}
         if encoding is not None:
@@ -40,9 +45,9 @@ def _read_sas(filepath, timestamp, *, format_type, user_missing=True, encoding) 
         actual_format = "xpt"
     elif format_type == "sas_sd2":
         raise ValueError(
-            "SD2 \u683c\u5f0f (SAS Dataset Descriptor) \u4e0d\u88ab pyreadstat \u652f\u6301\u3002\n"
-            "\u8bf7\u4f7f\u7528 SAS \u6216 Stat/Transfer \u5c06\u5176\u8f6c\u6362\u4e3a .sas7bdat \u540e\u8bfb\u5165\uff0c\n"
-            "\u6216\u7528 SAS \u547d\u4ee4 `proc cport` \u8f6c\u6362\u4e3a .xpt \u683c\u5f0f\u3002"
+            "SD2 格式 (SAS Dataset Descriptor) 不被 pyreadstat 支持。\n"
+            "请使用 SAS 或 Stat/Transfer 将其转换为 .sas7bdat 后读入，\n"
+            "或用 SAS 命令 `proc cport` 转换为 .xpt 格式。"
         )
     else:
         read_kwargs = {"dates_as_pandas_datetime": True, "user_missing": user_missing}

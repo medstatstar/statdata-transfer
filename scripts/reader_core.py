@@ -326,16 +326,45 @@ def _is_stata_special_missing(val: float) -> bool:
     return 100 <= val <= 127
 
 
+def _auto_detect_encoding(filepath: str, *, metadata_only: bool = True) -> str | None:
+    """自动检测 SPSS/Stata/SAS 文件的变量标签编码。
+    
+    尝试 GB18030 → GBK → Latin-1 回退链，返回第一个不会抛出异常的编码。
+    metadata_only=True 时仅读取元数据，加快速度。
+    """
+    for enc in ("gb18030", "gbk", "gb2312", "latin1"):
+        try:
+            if filepath.endswith((".sav", ".zsav", ".por")):
+                _, m = pyreadstat.read_sav(filepath, encoding=enc, metadataonly=metadata_only)
+            elif filepath.endswith(".dta"):
+                _, m = pyreadstat.read_dta(filepath, encoding=enc, metadataonly=metadata_only)
+            elif filepath.endswith((".sas7bdat", ".xpt")):
+                _, m = pyreadstat.read_sas7bdat(filepath, encoding=enc, metadataonly=metadata_only) if filepath.endswith(".sas7bdat") else pyreadstat.read_xport(filepath, encoding=enc, metadataonly=metadata_only)
+            else:
+                return None
+            # Quick check: try to decode a sample label if available
+            labels = getattr(m, "column_names_to_labels", {}) or {}
+            for v in labels.values():
+                if isinstance(v, str):
+                    v.encode(enc)
+            return enc
+        except Exception:
+            continue
+    return None
+
+
 def _extract_pyreadstat_meta(meta: Any) -> dict[str, Any]:
     """从 pyreadstat 元数据对象提取为纯 dict — 100% 覆盖 pyreadstat 属性"""
     if meta is None:
         return {}
+    # pyreadstat 的 variable_labels 属性不存在，使用 column_names_to_labels
+    column_names_to_labels = getattr(meta, "column_names_to_labels", {}) or {}
     return {
         # 文件基本信息
         "row_count": getattr(meta, "row_count", None),
         "column_count": getattr(meta, "column_count", None),
         "column_names": getattr(meta, "column_names", []),
-        "column_names_to_labels": getattr(meta, "column_names_to_labels", {}),
+        "column_names_to_labels": column_names_to_labels,
         "number_columns": getattr(meta, "number_columns", None),
         "number_rows": getattr(meta, "number_rows", None),
         "table_name": getattr(meta, "table_name", None),
@@ -345,27 +374,27 @@ def _extract_pyreadstat_meta(meta: Any) -> dict[str, Any]:
         "creation_time": str(getattr(meta, "creation_time", "")) if getattr(meta, "creation_time", None) else None,
         "modification_time": str(getattr(meta, "modification_time", "")) if getattr(meta, "modification_time", None) else None,
         "notes": getattr(meta, "notes", []),
-        # 变量级标签
-        "variable_labels": getattr(meta, "variable_labels", {}),
+        # 变量级标签 — variable_labels 与 column_names_to_labels 共用
+        "variable_labels": column_names_to_labels,
         "value_labels": getattr(meta, "value_labels", {}),
-        "variable_value_labels": getattr(meta, "variable_value_labels", {}),
-        "variable_to_label": getattr(meta, "variable_to_label", {}),
+        "variable_value_labels": getattr(meta, "variable_value_labels", {}) or {},
+        "variable_to_label": getattr(meta, "variable_to_label", {}) or {},
         # 变量属性
-        "variable_display_width": getattr(meta, "variable_display_width", {}),
-        "variable_storage_width": getattr(meta, "variable_storage_width", {}),
-        "variable_measure": getattr(meta, "variable_measure", {}),
-        "variable_alignment": getattr(meta, "variable_alignment", {}),
-        "original_variable_types": getattr(meta, "original_variable_types", {}),
-        "readstat_variable_types": getattr(meta, "readstat_variable_types", {}),
+        "variable_display_width": getattr(meta, "variable_display_width", {}) or {},
+        "variable_storage_width": getattr(meta, "variable_storage_width", {}) or {},
+        "variable_measure": getattr(meta, "variable_measure", {}) or {},
+        "variable_alignment": getattr(meta, "variable_alignment", {}) or {},
+        "original_variable_types": getattr(meta, "original_variable_types", {}) or {},
+        "readstat_variable_types": getattr(meta, "readstat_variable_types", {}) or {},
         # 缺失值
-        "missing_ranges": getattr(meta, "missing_ranges", {}),
-        "missing_user_values": getattr(meta, "missing_user_values", {}),
+        "missing_ranges": getattr(meta, "missing_ranges", {}) or {},
+        "missing_user_values": getattr(meta, "missing_user_values", {}) or {},
         # 以上全部确保在 dict 中
         "special_missing": getattr(meta, "special_missing", {}),  # SAS/Stata 特殊缺失值
         "mr_sets": getattr(meta, "mr_sets", {}),  # 多重响应集
         # 以下两个关键字段：variable_format 和 column_properties
-        "variable_format": getattr(meta, "variable_format", {}),  # Stata / SPSS / SAS 格式字符串
-        "column_properties": getattr(meta, "column_properties", {}),  # SPSS 列级属性
+        "variable_format": getattr(meta, "variable_format", {}) or {},  # Stata / SPSS / SAS 格式字符串
+        "column_properties": getattr(meta, "column_properties", {}) or {},  # SPSS 列级属性
     }
 
 

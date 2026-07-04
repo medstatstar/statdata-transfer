@@ -14,7 +14,7 @@ metadata:
   {
     "openclaw": { "emoji": "🛠️", "icon": "assets/icon.svg"},
     "authors": ["medstatstar", "phoe-zip"],
-    "version": "1.7.0",
+    "version": "1.8.0",
     "license": "MIT",
     "tags": ["data-conversion", "statistics", "spss", "stata", "sas", "clinical-trials", "metadata", "pandas", "bidirectional"],
     "homepage": "https://github.com/medstatstar/statdata-transfer",
@@ -55,37 +55,37 @@ metadata:
 
 ## 支持格式与能力对照表 | Supported Formats & Capability Matrix
 
-*按字母排序 | Sorted alphabetically.*
+*Sorted alphabetically.*
 
-| 格式 Format | 扩展名 Extension | 依赖 Dependency | 变量标签 Var Label | 值标签 Val Label | 特殊缺失 Special Missing | 公式 Formula | 元数据保留 Meta Preserve |
-|-------------|-----------------|:---:|:---:|:---:|:---:|:---:|:---:|
-| CDISC ODM | `.odm` | lxml | ✗ | ✗ | ✗ | ✗ | ⚠️ 仅临床数据 Clinical data only |
-| EpiData | `.rec` | R foreign | ✗ | ✗ | ✗ | ✗ | ⚠️ 通过R读入 Via R |
-| EpiInfo | `.prj` `.xml` | xml/etree | ✅ | ✅(codes) | ✗ | ✗ | ✅ XML结构 XML structure |
-| Excel | `.xlsx` `.xls` `.xlsm` | openpyxl / xlrd | ✗ | ✗ | ✗ | ⚠️ 仅结果 result only | ⚠️ 写出用额外工作表 Extra sheet for labels |
-| EViews | `.wf1` `.wf2` | 内置 built-in | ✗ | ✗ | ✗ | ✗ | ⚠️ JSON结构 JSON structure |
-| Feather | `.feather` `.arrow` | pyarrow | ✅(schema) | ✅(schema) | ✗ | ✗ | ⚠️ 版本差异 Version diff |
-| FST | `.fst` | fst (R) | ✅(schema) | ✅(schema) | ✗ | ✗ | ⚠️ 版本差异 Version diff |
-| GraphPad Prism | `.pzfx` `.pz` | pzfx | ✗ | ✗ | ✗ | ✗ | ⚠️ 多表 Multi-table |
-| Gretl | `.gdt` `.gdtb` | 内置 built-in | ✅ | ✅(tables) | ✗ | ✗ | ✅ string-tables |
-| HDF5 | `.h5` `.hdf5` | h5py | ✗ | ✗ | ✗ | ✗ | ⚠️ 层级结构 Hierarchy，写出用文件属性 attrs on write |
-| HTML | `.html` | lxml | ✗ | ✗ | ✗ | ✗ | ⚠️ 仅表格 Tables only |
-| jamovi | `.omv` | ZIP内置 ZIP built-in | ✅ | ✅ | ✗ | ✗ | ✅ JSON分析 JSON analysis |
-| JMP | `.jmp` | jmpio-python | ⚠️ | ⚠️ | ✗ | ✗ | ⚠️ 多表 Multi-table |
-| JSON | `.json` | 内置 built-in | ✅ | ✅ | ✗ | ✗ | ✅ 写出嵌入stat-full-meta stat-full-meta on write |
-| MATLAB | `.mat` | scipy | ✗ | ✗ | ✗ | ✗ | ⚠️ 变量名 Variable names |
-| Minitab | `.mtw` `.mpj` | mtbpy / R | ✗ | ✗ | ✗ | ✗ | ⚠️ 通过R读入 Via R |
-| ODS | `.ods` | odfpy | ✗ | ✗ | ✗ | ✗ | ⚠️ 仅数据 Data only |
-| ORC | `.orc` | pyarrow | ✅(schema) | ✅(schema) | ✗ | ✗ | ⚠️ 版本差异 Version diff |
-| Parquet | `.parquet` | pyarrow | ✅(schema) | ✅(schema) | ✗ | ✗ | ⚠️ 嵌套类型 Nested types，写出用schema.metadata schema.metadata on write |
-| R | `.rda` `.rds` `.rdata` | pyreadr + R | ✅ | ✅ | ✅ | ✗ | ✅ statdata_meta，写出通过R桥接 R bridge on write |
-| SAS | `.sas7bdat` `.xpt` `.sas7bcat` | pyreadstat | ✅ | ✅(需catalog need catalog) | ⚠️ | ✗ | ✅ |
+| Format | Extension | Dependency | Var Label | Val Label | Special Missing | Formula | Meta Preserve |
+|--------|-----------|------------|-----------|-----------|-----------------|---------|---------------|
+| CDISC ODM | `.odm` | lxml | ✗ | ✗ | ✗ | ✗ | ⚠️ Clinical data only |
+| EpiData | `.rec` | R foreign | ✗ | ✗ | ✗ | ✗ | ⚠️ Via R |
+| EpiInfo | `.prj` `.xml` | xml/etree | ✅ | ✅(codes) | ✗ | ✗ | ✅ XML structure |
+| Excel | `.xlsx` `.xls` `.xlsm` | openpyxl / xlrd | ✗ | ✗ | ✗ | ⚠️ result only | ⚠️ Extra sheet for labels |
+| EViews | `.wf1` `.wf2` | built-in | ✗ | ✗ | ✗ | ✗ | ⚠️ JSON structure |
+| Feather | `.feather` `.arrow` | pyarrow | ✅(schema) | ✅(schema) | ✗ | ✗ | ⚠️ Version diff |
+| FST | `.fst` | fst (R) | ✅(schema) | ✅(schema) | ✗ | ✗ | ⚠️ Version diff |
+| GraphPad Prism | `.pzfx` `.pz` | pzfx | ✗ | ✗ | ✗ | ✗ | ⚠️ Multi-table |
+| Gretl | `.gdt` `.gdtb` | built-in | ✅ | ✅(tables) | ✗ | ✗ | ✅ string-tables |
+| HDF5 | `.h5` `.hdf5` | h5py | ✗ | ✗ | ✗ | ✗ | ⚠️ Hierarchy, attrs on write |
+| HTML | `.html` | lxml | ✗ | ✗ | ✗ | ✗ | ⚠️ Tables only |
+| jamovi | `.omv` | ZIP built-in | ✅ | ✅ | ✗ | ✗ | ✅ JSON analysis |
+| JMP | `.jmp` | jmpio-python | ⚠️ | ⚠️ | ✗ | ✗ | ⚠️ Multi-table |
+| JSON | `.json` | built-in | ✅ | ✅ | ✗ | ✗ | ✅ stat-full-meta on write |
+| MATLAB | `.mat` | scipy | ✗ | ✗ | ✗ | ✗ | ⚠️ Variable names |
+| Minitab | `.mtw` `.mpj` | mtbpy / R | ✗ | ✗ | ✗ | ✗ | ⚠️ Via R |
+| ODS | `.ods` | odfpy | ✗ | ✗ | ✗ | ✗ | ⚠️ Data only |
+| ORC | `.orc` | pyarrow | ✅(schema) | ✅(schema) | ✗ | ✗ | ⚠️ Version diff |
+| Parquet | `.parquet` | pyarrow | ✅(schema) | ✅(schema) | ✗ | ✗ | ⚠️ Nested types, schema.metadata on write |
+| R | `.rda` `.rds` `.rdata` | pyreadr + R | ✅ | ✅ | ✅ | ✗ | ✅ statdata_meta, R bridge on write |
+| SAS | `.sas7bdat` `.xpt` `.sas7bcat` | pyreadstat | ✅ | ✅(need catalog) | ⚠️ | ✗ | ✅ |
 | SPSS | `.sav` `.zsav` `.por` | pyreadstat | ✅ | ✅ | ✅ | ✗ | ✅ |
 | Stata | `.dta` | pyreadstat | ✅ | ✅ | ⚠️ | ✗ | ✅ |
-| Weka ARFF | `.arff` | 内置 built-in | ✅ | ✅(nominal) | ✗ | ✗ | ✅ 名义映射 nominal mapping |
-| XML | `.xml` | lxml | ✗ | ✗ | ✗ | ✗ | ⚠️ 结构保留 Structure preserved |
+| Weka ARFF | `.arff` | built-in | ✅ | ✅(nominal) | ✗ | ✗ | ✅ nominal mapping |
+| XML | `.xml` | lxml | ✗ | ✗ | ✗ | ✗ | ⚠️ Structure preserved |
 
-> ✅=完整保留 Full preservation · ⚠️=部分保留或依赖条件 Partial/conditional · ✗=无法保留 Not preserved
+> ✅=Full preservation · ⚠️=Partial/conditional · ✗=Not preserved
 
 ## 返回结构 | Return Structure
 

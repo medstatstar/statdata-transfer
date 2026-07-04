@@ -19,6 +19,10 @@ from .reader_core import (ColumnInfo, StataMeta, StatFileResult, _bilingual, _ca
 def _read_stata(filepath, timestamp, *, user_missings, encoding) -> StatFileResult:
     warnings_list = []
     read_kwargs = {"user_missing": user_missings, "dates_as_pandas_datetime": True}
+    # Auto-detect encoding if user didn't specify one
+    if encoding is None:
+        from .reader_core import _auto_detect_encoding
+        encoding = _auto_detect_encoding(filepath)
     if encoding is not None:
         read_kwargs["encoding"] = encoding
     df, meta = pyreadstat.read_dta(filepath, **read_kwargs)

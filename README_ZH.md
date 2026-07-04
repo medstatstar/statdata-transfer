@@ -22,39 +22,36 @@
 ### 自动警告
 转换时检测并报告哪些元数据可以保留、哪些会丢失，避免静默的数据损失。所有警告信息均为中英双语。
 
-## 支持格式与能力对照表 | Supported Formats & Capability Matrix
-
-*按字母排序 | Sorted alphabetically.*
-
-| 格式 Format | 扩展名 Extension | 依赖 Dependency | 变量标签 Var Label | 值标签 Val Label | 特殊缺失 Special Missing | 公式 Formula | 元数据保留 Meta Preserve |
+| 格式 | 扩展名 | 依赖 | 变量标签 | 值标签 | 特殊缺失 | 公式 | 元数据保留 |
 |-------------|-----------------|:---:|:---:|:---:|:---:|:---:|:---:|
-| CDISC ODM | `.odm` | lxml | ✗ | ✗ | ✗ | ✗ | ⚠️ 仅临床数据 Clinical data only |
-| EpiData | `.rec` | R foreign | ✗ | ✗ | ✗ | ✗ | ⚠️ 通过R读入 Via R |
-| EpiInfo | `.prj` `.xml` | xml/etree | ✅ | ✅(codes) | ✗ | ✗ | ✅ XML结构 XML structure |
-| Excel | `.xlsx` `.xls` `.xlsm` | openpyxl / xlrd | ✗ | ✗ | ✗ | ⚠️ 仅结果 result only | ⚠️ 写出用额外工作表 Extra sheet for labels |
-| EViews | `.wf1` `.wf2` | 内置 built-in | ✗ | ✗ | ✗ | ✗ | ⚠️ JSON结构 JSON structure |
-| Feather | `.feather` `.arrow` | pyarrow | ✅(schema) | ✅(schema) | ✗ | ✗ | ⚠️ 版本差异 Version diff |
-| FST | `.fst` | fst (R) | ✅(schema) | ✅(schema) | ✗ | ✗ | ⚠️ 版本差异 Version diff |
-| GraphPad Prism | `.pzfx` `.pz` | pzfx | ✗ | ✗ | ✗ | ✗ | ⚠️ 多表 Multi-table |
-| Gretl | `.gdt` `.gdtb` | 内置 built-in | ✅ | ✅(tables) | ✗ | ✗ | ✅ string-tables |
-| HDF5 | `.h5` `.hdf5` | h5py | ✗ | ✗ | ✗ | ✗ | ⚠️ 层级结构 Hierarchy，写出用文件属性 attrs on write |
-| HTML | `.html` | lxml | ✗ | ✗ | ✗ | ✗ | ⚠️ 仅表格 Tables only |
-| jamovi | `.omv` | ZIP内置 ZIP built-in | ✅ | ✅ | ✗ | ✗ | ✅ JSON分析 JSON analysis |
-| JMP | `.jmp` | jmpio-python | ⚠️ | ⚠️ | ✗ | ✗ | ⚠️ 多表 Multi-table |
-| JSON | `.json` | 内置 built-in | ✅ | ✅ | ✗ | ✗ | ✅ 写出嵌入stat-full-meta stat-full-meta on write |
-| MATLAB | `.mat` | scipy | ✗ | ✗ | ✗ | ✗ | ⚠️ 变量名 Variable names |
-| Minitab | `.mw` `.mpj` | mtbpy / R | ✗ | ✗ | ✗ | ✗ | ⚠️ 通过R读入 Via R |
-| ODS | `.ods` | odfpy | ✗ | ✗ | ✗ | ✗ | ⚠️ 仅数据 Data only |
-| ORC | `.orc` | pyarrow | ✅(schema) | ✅(schema) | ✗ | ✗ | ⚠️ 版本差异 Version diff |
-| Parquet | `.parquet` | pyarrow | ✅(schema) | ✅(schema) | ✗ | ✗ | ⚠️ 嵌套类型 Nested types，写出用schema.metadata schema.metadata on write |
-| R | `.rda` `.rds` | pyreadr + R | ✅ | ✅ | ✅ | ✗ | ✅ statdata_meta，写出通过R桥接 R bridge on write |
-| SAS | `.sas7bdat` `.xpt` `.sas7bcat` | pyreadstat | ✅ | ✅(需catalog need catalog) | ⚠️ | ✗ | ✅ |
+| CDISC ODM | `.odm` | lxml | ✗ | ✗ | ✗ | ✗ | ⚠️ 仅临床数据 |
+| EpiData | `.rec` | R | ✗ | ✗ | ✗ | ✗ | ⚠️ 通过R读入 |
+| EpiInfo | `.prj` `.xml` | xml/etree | ✅ | ✅(codes) | ✗ | ✗ | ✅ XML结构 |
+| Excel | `.xlsx` `.xls` `.xlsm` | openpyxl / xlrd | ✗ | ✗ | ✗ | ⚠️ 仅结果 | ⚠️ 写出用额外工作表 |
+| EViews | `.wf1` `.wf2` | 内置 | ✗ | ✗ | ✗ | ✗ | ⚠️ JSON结构 |
+| Feather | `.feather` `.arrow` | pyarrow | ✅(schema) | ✅(schema) | ✗ | ✗ | ⚠️ 版本差异 |
+| FST | `.fst` | fst (R) | ✅(schema) | ✅(schema) | ✗ | ✗ | ⚠️ 版本差异 |
+| GraphPad Prism | `.pzfx` `.pz` | pzfx | ✗ | ✗ | ✗ | ✗ | ⚠️ 多表 |
+| Gretl | `.gdt` `.gdtb` | 内置 | ✅ | ✅(tables) | ✗ | ✗ | ✅ string-tables |
+| HDF5 | `.h5` `.hdf5` | h5py | ✗ | ✗ | ✗ | ✗ | ⚠️ 层级结构，写出用文件属性 |
+| HTML | `.html` | lxml | ✗ | ✗ | ✗ | ✗ | ⚠️ 仅表格 |
+| jamovi | `.omv` | ZIP内置 | ✅ | ✅ | ✗ | ✗ | ✅ JSON分析 |
+| JMP | `.jmp` | jmpio-python | ⚠️ | ⚠️ | ✗ | ✗ | ⚠️ 多表 |
+| JSON | `.json` | 内置 | ✅ | ✅ | ✗ | ✗ | ✅ 写出嵌入stat-full-meta |
+| MATLAB | `.mat` | scipy | ✗ | ✗ | ✗ | ✗ | ⚠️ 变量名 |
+| Minitab | `.mtw` `.mpj` | mtbpy / R | ✗ | ✗ | ✗ | ✗ | ⚠️ 通过R读入 |
+| ODS | `.ods` | odfpy | ✗ | ✗ | ✗ | ✗ | ⚠️ 仅数据 |
+| ORC | `.orc` | pyarrow | ✅(schema) | ✅(schema) | ✗ | ✗ | ⚠️ 版本差异 |
+| Parquet | `.parquet` | pyarrow | ✅(schema) | ✅(schema) | ✗ | ✗ | ⚠️ 嵌套类型，写出用schema.metadata |
+| R | `.rda` `.rds` | pyreadr + R | ✅ | ✅ | ✅ | ✗ | ✅ statdata_meta，写出通过R桥接 |
+| SAS | `.sas7bdat` `.xpt` `.sas7bcat` | pyreadstat | ✅ | ✅(需catalog) | ⚠️ | ✗ | ✅ |
 | SPSS | `.sav` `.zsav` `.por` | pyreadstat | ✅ | ✅ | ✅ | ✗ | ✅ |
 | Stata | `.dta` | pyreadstat | ✅ | ✅ | ⚠️ | ✗ | ✅ |
-| Weka ARFF | `.arff` | 内置 built-in | ✅ | ✅(nominal) | ✗ | ✗ | ✅ 名义映射 nominal mapping |
-| XML | `.xml` | lxml | ✗ | ✗ | ✗ | ✗ | ⚠️ 结构保留 Structure preserved |
+| Weka ARFF | `.arff` | 内置 | ✅ | ✅(nominal) | ✗ | ✗ | ✅ 名义映射 |
+| XML | `.xml` | lxml | ✗ | ✗ | ✗ | ✗ | ⚠️ 结构保留 |
 
-> ✅=完整保留 Full preservation · ⚠️=部分保留或条件性 Partial/conditional · ✗=无法保留 Not preserved
+> ✅=完整保留 · ⚠️=部分保留或条件性 · ✗=无法保留
+*按字母排序*
 
 ## 返回结构
 
@@ -126,99 +123,96 @@ pip install -r requirements.txt
 
 ## 格式限制与解决方案
 
+以下仅列出**真正的限制和警告**，默认支持的不重复说明。
+*按字母排序，能力矩阵见 SKILL.md。*
+
 ### CDISC ODM (.odm)
-- XML 结构依赖，部分复杂 ODM 文件的嵌套结构可能解析不完整。
+**读入限制：**
+- XML 结构依赖，嵌套解析取决于 ODM 文件结构规范性。复杂的 AttributeValue 结构可能解析不完整。
+- ODM 规范本身不含统计元数据（变量标签、值标签），仅保留临床数据结构。
 
 ### EpiData (.rec)
-- 需通过 R `foreign` 包转换，需要 R 环境。
+**读入限制：**
+- 唯一读入路径为 R + `foreign` 包。无 Python 原生备选方案。
+- 统计元数据（变量标签、值标签）在 R → CSV 桥接过程中丢失。
 
 ### EpiInfo (.prj)
+**读入限制：**
 - 项目文件不含数据，需关联外部 CSV。
 - 自动搜索同名 CSV 或交叉验证目录内 CSV。
 - Access 不支持，需先导出 CSV。
 
-### Excel (.xlsx)
+### Excel (.xlsx/.xls)
+**读入限制：**
 - 合并单元格仅保留左上角值，其余为 NaN。
 - 公式丢失，仅保留计算结果。
 - 图表/形状不提取。
 
-### EViews (.wf1/.wf2)
-- JSON 结构（EVWS 格式），变量信息可完整提取。
-
-### Feather (.feather)
-- 标签存于 Arrow schema.metadata，版本兼容性取决于 pyarrow。
-
-### FST (.fst)
-- 需要 R `fst` 包读写。
-
-### GraphPad Prism (.pzfx)
-- 可能含多表，当前读入主数据表。
-
-### Gretl (.gdt)
-- XML/gzip 双格式自动检测。
-- `.gdtb` 二进制不可读，需先导出为 XML。
+**转存说明：**
+- 变量/值标签存储在独立元数据工作表中。
 
 ### HDF5 (.h5)
+**读入限制：**
 - 层级结构展平为顶级变量。
-- 属性未提取为元数据。
+- HDF5 数据集属性收集到 `hdf5_metadata.file_attributes` 中，但不自动解析为变量标签。仅 `stat-full-meta` 格式嵌入元数据可自动恢复。
 
-### HTML (.html)
-- 读取 HTML 表格，格式样式丢失。
-
-### jamovi (.omv)
-- 内置 ZIP，JSON 变量定义完整读入。
+**转存说明：**
+- 写入时使用文件级属性存储元数据（via h5py）。
 
 ### JMP (.jmp)
+**读入限制：**
 - 依赖 jmpio-python，版本支持不一。
+- 多表 JMP 文件仅返回第一个数据表（额外表的元数据保存在 jmp_metadata 中）。
 
-### JSON (.json)
-- 使用 `{"meta":..., "data":[...]}` 包裹结构保留元数据。
+**转存说明：**
+- 仅支持单表写出，多表结构可能丢失表级元数据。
 
 ### MATLAB (.mat)
-- v7.3+ 基于 HDF5，scipy.io.loadmat 无法读取，需用 h5py。
-
-### Minitab (.mw)
-- 需 R 环境中转。
-
-### ODS (.ods)
-- 通过 odfpy 读入，格式丢失。
-
-### ORC (.orc)
-- 列存格式，标签存 Arrow schema.metadata。
+**读入限制：**
+- v7.3+（HDF5 格式）：scipy.io.loadmat 无法读取，当前代码路径中未实现 h5py 回退。
+- 复杂结构（嵌套 cell、稀疏矩阵、函数句柄）回退为单列扁平化输出。
+- Object 类和 datetime 列在转换中丢失类型保真度。
 
 ### Parquet (.parquet)
-- 嵌套类型 >2 层可能自动展平。
+**读入限制：**
+- 深层嵌套类型（>2 层 list<struct>）通过 pyarrow.to_pandas() 转换后变为不透明的 Python 对象列。Arrow schema 保真度保留，但 pandas 表示可能丢失结构。
 - 分区数据集暂未支持（仅单文件）。
 
 ### R (.rda/.rds)
-- 旧版 ASCII XDR (RDA2) pyreadr 不支持，自动回退 R。
-- factor 顺序可能未保留为 Categorical 顺序。
-- 多对象 RDA：`read_all_r_objects()` 返回全部。
+**读入限制：**
+- 旧版 ASCII XDR (RDA2)：pyreadstat 无法读取，**已自动回退到 R**（推荐安装 R）。无 R 时该格式失败。
+- factor 顺序可能未保留为 Categorical 顺序，除非通过 stat-full-meta 嵌入。
+- 多对象 RDA 文件：`read_all_r_objects()` 返回全部对象列表。
+
+**转存说明：**
+- 写回操作通过 R 桥接（statdata_meta 属性）实现完整元数据往返。
 
 ### SAS (.sas7bdat)
+**读入限制：**
 - 值标签定义在 `.sas7bcat`，需与数据文件同目录自动加载。
 - Viya CAS 新格式不支持。
 - 日期基准：1960-01-01。
 
-### SPSS (.sav)
+### SPSS (.sav/.zsav/.por)
+**读入限制：**
 - MR Sets 读入为原始字典，语义需手动重建。
 - 公式丢失，仅保留计算结果。
 - 特殊缺失值标记需保留。
-- `.zsav` 不支持，降级到 `.sav`。
+- `.zsav` 读入需 gzip 解压，pyreadstat 1.2+ 直接支持，否则自动降级为解压后读入。
+- `.por` 为 SPSS 旧版导出格式，变量类型映射可能简化。
+
+**转存说明：**
+- `.zsav` 写出需 pyreadstat 1.2+ 支持，否则自动降级为 `.sav` 写出。
 
 ### Stata (.dta)
-- `.a`-`.z` 特殊缺失值读入后变 NaN。
-- 旧版 (pre-v13) 可能 Latin-1 编码，需指定 `encoding='latin1'`。
-- Stata 117-119 不支持，降级到 version 15。
+**读入限制：**
+- 特殊缺失值（.a–.z）：当 user_missing=True（默认）时保留为 DataFrame 中的字符标签；当 user_missing=False 时不可逆地变为 NaN。
+- 旧版 (pre-v13) 可能 Latin-1 编码，需指定 encoding='latin1'。
+- Stata 117-119（最新格式）：pyreadstat 1.3.5 不支持，写回时自动降级为 version 15。
 
-### Weka ARFF (.arff)
-- 支持 NUMERIC/STRING/NOMINAL/DATE/RELATIONAL。
-- 名义变量保留原始大小写，映射为 Categorical。
-- 稀疏格式 `{index value}` 完整解析。
-
-### XML (.xml)
-- 读取良构 XML，无 schema 假设。
+**转存说明：**
+- user_missing=True 时特殊缺失标签通过 missing_user_values 参数正确写回。
 
 ## 许可证
 
-MIT License。详见 [LICENSE](LICENSE)。
+MIT 许可证。详见 [LICENSE](LICENSE)。

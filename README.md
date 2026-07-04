@@ -1,6 +1,6 @@
 # statdata-transfer | Statistical Data Format Converter
 
-[🇨🇳 中文 (Chinese)](./README_zh.md) | [🇬🇧 English](./README.md)
+[🇨🇳 中文 (Chinese)](./README_ZH.md)
 
 ---
 
@@ -11,7 +11,7 @@ Note: This skill does not require any statistical software to be installed, but 
 ## Core Capabilities
 
 ### Read (Data Extraction)
-Extract data + metadata from 28+ statistical formats into pandas DataFrame, using it as an intermediate format to preserve metadata as completely as possible, and clearly indicate what is preserved vs lost. SPSS/Stata/SAS preserve all metadata types.
+Extract data + all metadata (variable labels, value labels, special missing values, etc.) from 28+ statistical formats into pandas DataFrame as an intermediate format. Preserves metadata as completely as possible and clearly indicates what is preserved vs lost.
 
 ### Write / Convert (Format Conversion)
 Convert read results to any other format:
@@ -22,39 +22,39 @@ Convert read results to any other format:
 ### Auto Warnings
 Automatically detects and reports what metadata can be preserved vs lost during conversion, avoiding silent data loss. All user-facing messages are bilingual (zh-cn/en).
 
-## 支持格式与能力对照表 | Supported Formats & Capability Matrix
+## Supported Formats & Capability Matrix
 
-*按字母排序 | Sorted alphabetically.*
+*Sorted alphabetically.*
 
-| 格式 Format | 扩展名 Extension | 依赖 Dependency | 变量标签 Var Label | 值标签 Val Label | 特殊缺失 Special Missing | 公式 Formula | 元数据保留 Meta Preserve |
-|-------------|-----------------|:---:|:---:|:---:|:---:|:---:|:---:|
-| CDISC ODM | `.odm` | lxml | ✗ | ✗ | ✗ | ✗ | ⚠️ 仅临床数据 Clinical data only |
-| EpiData | `.rec` | R foreign | ✗ | ✗ | ✗ | ✗ | ⚠️ 通过R读入 Via R |
-| EpiInfo | `.prj` `.xml` | xml/etree | ✅ | ✅(codes) | ✗ | ✗ | ✅ XML结构 XML structure |
-| Excel | `.xlsx` `.xls` `.xlsm` | openpyxl / xlrd | ✗ | ✗ | ✗ | ⚠️ 仅结果 result only | ⚠️ 写出用额外工作表 Extra sheet for labels |
-| EViews | `.wf1` `.wf2` | 内置 built-in | ✗ | ✗ | ✗ | ✗ | ⚠️ JSON结构 JSON structure |
-| Feather | `.feather` `.arrow` | pyarrow | ✅(schema) | ✅(schema) | ✗ | ✗ | ⚠️ 版本差异 Version diff |
-| FST | `.fst` | fst (R) | ✅(schema) | ✅(schema) | ✗ | ✗ | ⚠️ 版本差异 Version diff |
-| GraphPad Prism | `.pzfx` `.pz` | pzfx | ✗ | ✗ | ✗ | ✗ | ⚠️ 多表 Multi-table |
-| Gretl | `.gdt` `.gdtb` | 内置 built-in | ✅ | ✅(tables) | ✗ | ✗ | ✅ string-tables |
-| HDF5 | `.h5` `.hdf5` | h5py | ✗ | ✗ | ✗ | ✗ | ⚠️ 层级结构 Hierarchy，写出用文件属性 attrs on write |
-| HTML | `.html` | lxml | ✗ | ✗ | ✗ | ✗ | ⚠️ 仅表格 Tables only |
-| jamovi | `.omv` | ZIP内置 ZIP built-in | ✅ | ✅ | ✗ | ✗ | ✅ JSON分析 JSON analysis |
-| JMP | `.jmp` | jmpio-python | ⚠️ | ⚠️ | ✗ | ✗ | ⚠️ 多表 Multi-table |
-| JSON | `.json` | 内置 built-in | ✅ | ✅ | ✗ | ✗ | ✅ 写出嵌入stat-full-meta stat-full-meta on write |
-| MATLAB | `.mat` | scipy | ✗ | ✗ | ✗ | ✗ | ⚠️ 变量名 Variable names |
-| Minitab | `.mtw` `.mpj` | mtbpy / R | ✗ | ✗ | ✗ | ✗ | ⚠️ 通过R读入 Via R |
-| ODS | `.ods` | odfpy | ✗ | ✗ | ✗ | ✗ | ⚠️ 仅数据 Data only |
-| ORC | `.orc` | pyarrow | ✅(schema) | ✅(schema) | ✗ | ✗ | ⚠️ 版本差异 Version diff |
-| Parquet | `.parquet` | pyarrow | ✅(schema) | ✅(schema) | ✗ | ✗ | ⚠️ 嵌套类型 Nested types，写出用schema.metadata schema.metadata on write |
-| R | `.rda` `.rds` `.rdata` | pyreadr + R | ✅ | ✅ | ✅ | ✗ | ✅ statdata_meta，写出通过R桥接 R bridge on write |
-| SAS | `.sas7bdat` `.xpt` `.sas7bcat` | pyreadstat | ✅ | ✅(需catalog need catalog) | ⚠️ | ✗ | ✅ |
+| Format | Extension | Dependency | Var Label | Val Label | Special Missing | Formula | Meta Preserve |
+|--------|-----------|------------|-----------|-----------|-----------------|---------|---------------|
+| CDISC ODM | `.odm` | lxml | ✗ | ✗ | ✗ | ✗ | ⚠️ Clinical data only |
+| EpiData | `.rec` | R foreign | ✗ | ✗ | ✗ | ✗ | ⚠️ Via R |
+| EpiInfo | `.prj` `.xml` | xml/etree | ✅ | ✅(codes) | ✗ | ✗ | ✅ XML structure |
+| Excel | `.xlsx` `.xls` `.xlsm` | openpyxl / xlrd | ✗ | ✗ | ✗ | ⚠️ result only | ⚠️ Extra sheet for labels |
+| EViews | `.wf1` `.wf2` | built-in | ✗ | ✗ | ✗ | ✗ | ⚠️ JSON structure |
+| Feather | `.feather` `.arrow` | pyarrow | ✅(schema) | ✅(schema) | ✗ | ✗ | ⚠️ Version diff |
+| FST | `.fst` | fst (R) | ✅(schema) | ✅(schema) | ✗ | ✗ | ⚠️ Version diff |
+| GraphPad Prism | `.pzfx` `.pz` | pzfx | ✗ | ✗ | ✗ | ✗ | ⚠️ Multi-table |
+| Gretl | `.gdt` `.gdtb` | built-in | ✅ | ✅(tables) | ✗ | ✗ | ✅ string-tables |
+| HDF5 | `.h5` `.hdf5` | h5py | ✗ | ✗ | ✗ | ✗ | ⚠️ Hierarchy, attrs on write |
+| HTML | `.html` | lxml | ✗ | ✗ | ✗ | ✗ | ⚠️ Tables only |
+| jamovi | `.omv` | ZIP built-in | ✅ | ✅ | ✗ | ✗ | ✅ JSON analysis |
+| JMP | `.jmp` | jmpio-python | ⚠️ | ⚠️ | ✗ | ✗ | ⚠️ Multi-table |
+| JSON | `.json` | built-in | ✅ | ✅ | ✗ | ✗ | ✅ stat-full-meta on write |
+| MATLAB | `.mat` | scipy | ✗ | ✗ | ✗ | ✗ | ⚠️ Variable names |
+| Minitab | `.mtw` `.mpj` | mtbpy / R | ✗ | ✗ | ✗ | ✗ | ⚠️ Via R |
+| ODS | `.ods` | odfpy | ✗ | ✗ | ✗ | ✗ | ⚠️ Data only |
+| ORC | `.orc` | pyarrow | ✅(schema) | ✅(schema) | ✗ | ✗ | ⚠️ Version diff |
+| Parquet | `.parquet` | pyarrow | ✅(schema) | ✅(schema) | ✗ | ✗ | ⚠️ Nested types, schema.metadata on write |
+| R | `.rda` `.rds` | pyreadr + R | ✅ | ✅ | ✅ | ✗ | ✅ statdata_meta, R bridge on write |
+| SAS | `.sas7bdat` `.xpt` `.sas7bcat` | pyreadstat | ✅ | ✅(need catalog) | ⚠️ | ✗ | ✅ |
 | SPSS | `.sav` `.zsav` `.por` | pyreadstat | ✅ | ✅ | ✅ | ✗ | ✅ |
 | Stata | `.dta` | pyreadstat | ✅ | ✅ | ⚠️ | ✗ | ✅ |
-| Weka ARFF | `.arff` | 内置 built-in | ✅ | ✅(nominal) | ✗ | ✗ | ✅ 名义映射 nominal mapping |
-| XML | `.xml` | lxml | ✗ | ✗ | ✗ | ✗ | ⚠️ 结构保留 Structure preserved |
+| Weka ARFF | `.arff` | built-in | ✅ | ✅(nominal) | ✗ | ✗ | ✅ nominal mapping |
+| XML | `.xml` | lxml | ✗ | ✗ | ✗ | ✗ | ⚠️ Structure preserved |
 
-> ✅=完整保留 Full preservation · ⚠️=部分保留或条件性 Partial/conditional · ✗=无法保留 Not preserved
+> ✅=Full preservation · ⚠️=Partial/conditional · ✗=Not preserved
 
 ## Return Structure
 
@@ -78,9 +78,9 @@ Automatically detects and reports what metadata can be preserved vs lost during 
 |----------|---------------|
 | Data warehousing / ETL | SPSS `.sav` or Stata `.dta` → Parquet / HDF5 |
 | Scientific computing | `.mat` or `.hdf5` → NumPy / pandas |
-| Statistical analysis (Python) | `.sav` / `.dta` → pandas (preserve metadata) → scipy.stats |
+| Statistical analysis (Python) | `.sav` / `.dta` → pandas → scipy.stats |
 | Report output | pandas → JSON / HTML / Excel |
-| Cross-software sharing | Stata ↔ SPSS ↔ R direct interconversion (no intermediate format) |
+| Cross-software sharing | Stata ↔ SPSS ↔ R direct interconversion |
 
 ## File Size Limits
 
@@ -128,98 +128,95 @@ Want to add a new format? Edit `scripts/reader_*.py` to add a reader function, r
 *Alphabetically ordered. See SKILL.md for the capability matrix.*
 
 ### CDISC ODM (.odm)
-- **XML structure dependency**: `ItemGroupData`/`ItemData` nested parsing depends on ODM file structure regularity. Some complex `AttributeValue` structures may not be fully parsed.
+**Read Limitations:**
+- XML structure dependency: Nested parsing depends on ODM file structure regularity. Complex AttributeValue structures may not be fully parsed.
+- Statistical metadata (variable labels, value labels) is not part of the ODM specification — only clinical data structure is preserved.
 
 ### EpiData (.rec)
-- **R foreign dependency**: Requires R environment for conversion via `foreign` package.
+**Read Limitations:**
+- Requires R + `foreign` package as the only reader. No Python-native fallback available.
+- Statistical metadata (variable labels, value labels) is lost during R-to-CSV bridge.
 
 ### EpiInfo (.prj)
-- **External data file required**: `.prj` files contain no data. Automatically associates CSV files with the same name in the same directory.
+**Read Limitations:**
+- External data file required: `.prj` files contain no data. Automatically associates CSV files with the same name in the same directory.
 - Falls back to header-field cross-validation if no same-name CSV exists.
-- Access database files are not supported; export to CSV from EpiInfo first.
+- Access database files not supported; export to CSV first.
+
+**Write Notes:**
+- Variable labels and value labels stored in XML project structure can be reconstructed (codes/options definitions extracted).
 
 ### Excel (.xlsx/.xls)
-- **Merged cells**: Only top-left value retained; merged area cells become NaN.
-- **Formulas**: Computed values only; formula definitions are lost.
-- **Charts/shapes**: Not extracted.
+**Read Limitations:**
+- Merged cells: Only top-left value retained; merged area cells become NaN.
+- Formulas: Computed values only; formula definitions are lost.
+- Charts/shapes: Not extracted.
 
-### EViews (.wf1/.wf2)
-- **JSON structure**: Parsed from EVWS format; page variable info extracted.
-
-### Feather (.feather)
-- **Version sensitivity**: Labels preserved in Arrow schema.metadata; version compatibility depends on pyarrow.
-
-### FST (.fst)
-- **R package**: Requires R `fst` package for read/write.
-
-### GraphPad Prism (.pzfx)
-- **Multi-table**: Pzfx files may contain multiple tables; current implementation extracts primary data.
-
-### Gretl (.gdt)
-- **XML/gzip dual-format**: Auto-detected.
-- `.gdtb` binary format not directly readable; user prompted to export as XML via Gretl.
+**Write Notes:**
+- Variable/value labels stored in a separate metadata worksheet.
 
 ### HDF5 (.h5)
-- **Hierarchical structure**: Nested groups are flattened to top-level variables.
-- **Attributes**: HDF5 dataset attributes not extracted to metadata.
+**Read Limitations:**
+- Hierarchical structure: Nested groups are flattened to top-level variables.
+- HDF5 dataset attributes are collected into `hdf5_metadata.file_attributes` but are not auto-parsed as variable labels. Only the `stat-full-meta` embedded format is auto-restored.
 
-### HTML (.html)
-- **Table extraction**: Reads HTML tables; formatting/styling discarded.
-
-### jamovi (.omv)
-- **ZIP archive**: Variable definitions from JSON structure fully extracted.
+**Write Notes:**
+- Root-level attributes used for metadata storage on write (via `h5py`).
 
 ### JMP (.jmp)
-- **Library dependency**: Relies on `jmpio-python`; target version support varies.
+**Read Limitations:**
+- Requires `jmpio-python` library; target version support varies.
+- Multi-table JMP files: only the first table is returned (additional table metadata preserved in `jmp_metadata`).
 
-### JSON (.json)
-- **Custom wrapper**: Uses `{"meta": {...}, "data": [...]}` wrapper for full metadata preservation.
+**Write Notes:**
+- Single-table write only. Multi-table structures may lose table-level metadata.
 
 ### MATLAB (.mat)
-- **v7.3+ (HDF5)**: scipy.io.loadmat cannot read v7.3+ files; use h5py directly.
-
-### Minitab (.mtw)
-- **R relay**: Converted via R environment.
-
-### ODS (.ods)
-- **OpenDocument**: Read via odfpy; formatting discarded.
-
-### ORC (.orc)
-- **Columnar**: Same Arrow schema.metadata label preservation as Parquet.
+**Read Limitations:**
+- v7.3+ (HDF5-based): `scipy.io.loadmat` cannot read these files. No fallback to `h5py` is implemented in the current code path.
+- Complex structures (nested cells, sparse matrices, function handles) fall back to single-column flattened output.
+- Object classes and datetime columns lose type fidelity during conversion.
 
 ### Parquet (.parquet)
-- **Nested types**: Map/Struct/List depth >2 may auto-flatten to multiple columns.
-- **Partitioned datasets**: Directory-partitioned Parquet not yet supported (single file only).
+**Read Limitations:**
+- Deeply nested types (>2 levels of `list<struct>`) become opaque Python object columns when converted via `pyarrow.to_pandas()`. Arrow schema fidelity is preserved, but pandas representation may lose structure.
+- Directory-partitioned Parquet datasets not yet supported (single file only).
 
 ### R (.rda/.rds)
-- **ASCII XDR**: Old-format RDA files (`RDA2\nA\n` header) cannot be read by pyreadr; auto-fallback to R.
-- **Factor level order**: R factor level order may not be preserved as pandas Categorical ordering.
-- **Multi-object RDA**: Files may contain multiple objects; `read_all_r_objects()` returns all.
+**Read Limitations:**
+- Old-format ASCII XDR (RDA2) files: `pyreadstat` cannot read them. **Auto-fallback to R** works when R is installed (recommended). Without R, these files fail.
+- Factor level order may not be preserved as `pandas.Categorical` ordering unless embedded via `stat-full-meta`.
+- Multi-object RDA files: `read_all_r_objects()` returns all objects as a list.
+
+**Write Notes:**
+- Write operations routed through R bridge (`statdata_meta` attribute) for full metadata round-trip.
 
 ### SAS (.sas7bdat)
-- **Catalog file**: Value labels in `.sas7bcat` must be co-located with data file for auto-load.
-- **Viya CAS**: `.sashdat` and other new formats not supported.
-- **DATE origin**: 1960-01-01 (same as Stata).
+**Read Limitations:**
+- Value labels require a co-located `.sas7bcat` catalog file (auto-searched in same directory). Without catalog, value labels are absent.
+- Viya CAS `.sashdat` and other new SAS formats are not supported by `pyreadstat`.
+- DATE origin: 1960-01-01 (same as Stata).
 
-### SPSS (.sav)
-- **MR Sets**: Imported as raw dictionary; semantics require manual reconstruction.
-- **Inline formulas**: Variable calculation formulas lost; only computed results retained.
-- **Special missing values**: Marked in `special_missing`; preserve on write.
-- `.zsav` compressed: Not supported by pyreadstat; falls back to `.sav`.
+### SPSS (.sav/.zsav/.por)
+**Read Limitations:**
+- MR Sets imported as raw dictionary; semantics not preserved (pyreadstat limitation). Data is retained but structure requires manual reconstruction.
+- Variable calculation formulas are lost; only computed results retained.
+- Special missing values (`.A`–`.Z`, system missing) flagged in `special_missing`; must be explicitly preserved on write.
+- `.zsav` read requires gzip decompression (pyreadstat 1.2+ or auto-fallback to tempfile decompression).
+- `.por` (older SPSS portable format): variable type mapping simplified; some metadata fields absent.
+
+**Write Notes:**
+- `.zsav` write requires pyreadstat 1.2+; otherwise auto-fallback to uncompressed `.sav`.
 
 ### Stata (.dta)
-- **Special missing values**: `.a`–`.z` become NaN; original distinction semantics lost.
-- **String encoding**: Pre-v13 Stata may use Latin-1; specify `encoding='latin1'`.
-- **Stata 117-119**: pyreadstat 1.3.5 not supported; auto-downgrade to version 15.
+**Read Limitations:**
+- Special missing values (`.a`–`.z`): when `user_missing=True` (default), these are preserved as character tags in the DataFrame. When `user_missing=False`, they become NaN and original distinction is **lost irreversibly**.
+- String encoding: Pre-v13 Stata files may use Latin-1; specify `encoding='latin1'`.
+- Stata 117-119 (newest format): not supported by pyreadstat 1.3.5; auto-downgrade to version 15 on write.
 
-### Weka ARFF (.arff)
-- **Type support**: NUMERIC/INTEGER/REAL/STRING/DATE/NOMINAL/RELATIONAL.
-- **Nominal case**: Original case preserved; mapped to `pd.Categorical`.
-- **Sparse format**: `{index value}` fully parsed.
-
-### XML (.xml)
-- **Structure-agnostic**: Reads well-formed XML; no schema assumed.
+**Write Notes:**
+- When `user_missing=True`, special missing tags are written back correctly via `missing_user_values` parameter.
 
 ## License
 
-MIT License. See [LICENSE](LICENSE) for details.
+MIT-0 License. See [LICENSE](LICENSE) for details.
