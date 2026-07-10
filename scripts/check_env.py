@@ -25,8 +25,8 @@ REQUIRED_PACKAGES = {
     "pzfx": "pzfx",
 }
 
-def check_and_install():
-    """检测并安装缺失的包"""
+def check_and_install(auto_install: bool = False):
+    """检测依赖包；仅当 auto_install=True 时才安装（默认只检测，避免静默修改 Python 环境）。"""
     missing = []
     installed = []
 
@@ -44,32 +44,42 @@ def check_and_install():
 
     if missing:
         missing_str = ', '.join(missing)
-        print(f"\n{_bilingual(f'=== 自动安装缺失包: {missing_str} ===', f'=== Auto-installing missing packages: {missing_str} ===')}")
-        # 使用 conda 或 pip 安装
-        for pkg in missing:
-            print(f"\n{_bilingual(f'正在安装 {pkg}...', f'Installing {pkg}...')}")
-            try:
-                # 先尝试 conda（更快，二进制包）
-                result = subprocess.run(
-                    ["conda", "install", "-y", pkg, "-c", "conda-forge"],
-                    capture_output=True, text=True, timeout=300
-                )
-                if result.returncode != 0:
-                    # 降级到 pip
+        if auto_install:
+            print(f"\n{_bilingual(f'=== 正在安装缺失包: {missing_str} ===', f'=== Installing missing packages: {missing_str} ===')}")
+            # 使用 conda 或 pip 安装
+            for pkg in missing:
+                print(f"\n{_bilingual(f'正在安装 {pkg}...', f'Installing {pkg}...')}")
+                try:
+                    # 先尝试 conda（更快，二进制包）
                     result = subprocess.run(
-                        [sys.executable, "-m", "pip", "install", pkg],
+                        ["conda", "install", "-y", pkg, "-c", "conda-forge"],
                         capture_output=True, text=True, timeout=300
                     )
                     if result.returncode != 0:
-                        print(f"  ❌ {_bilingual(f'{pkg} 安装失败', f'{pkg} install failed')}: {result.stderr[:500]}")
+                        # 降级到 pip
+                        result = subprocess.run(
+                            [sys.executable, "-m", "pip", "install", pkg],
+                            capture_output=True, text=True, timeout=300
+                        )
+                        if result.returncode != 0:
+                            print(f"  ❌ {_bilingual(f'{pkg} 安装失败', f'{pkg} install failed')}: {result.stderr[:500]}")
+                        else:
+                            print(f"  ✅ {pip_name} {_bilingual('已通过 pip 安装成功', 'installed via pip successfully')}")
                     else:
-                        print(f"  ✅ {pip_name} {_bilingual('已通过 pip 安装成功', 'installed via pip successfully')}")
-                else:
-                    print(f"  ✅ {pip_name} {_bilingual('已通过 conda 安装成功', 'installed via conda successfully')}")
-            except Exception as e:
-                print(f"  ❌ {_bilingual(f'{pkg} 安装异常', f'{pkg} install error')}: {str(e)[:200]}")
+                        print(f"  ✅ {pip_name} {_bilingual('已通过 conda 安装成功', 'installed via conda successfully')}")
+                except Exception as e:
+                    print(f"  ❌ {_bilingual(f'{pkg} 安装异常', f'{pkg} install error')}: {str(e)[:200]}")
+        else:
+            print(f"\n{_bilingual(f'⚠️ 缺失包: {missing_str}', f'⚠️ Missing packages: {missing_str}')}")
+            print(_bilingual("默认仅检测，不修改环境。如需自动安装，请加 --install 参数运行本脚本。",
+                            "By default this only checks; it does not modify the environment. To auto-install, run with --install."))
     else:
         print(_bilingual("\n✅ 所有依赖包已就绪", "\n✅ All dependencies are ready"))
 
 if __name__ == "__main__":
-    check_and_install()
+    import argparse
+    _p = argparse.ArgumentParser(description=_bilingual("statdata-transfer 依赖检测", "statdata-transfer dependency check"))
+    _p.add_argument("--install", action="store_true",
+                    help=_bilingual("自动安装缺失的依赖包（会修改 Python 环境）", "Auto-install missing dependencies (modifies the Python environment)"))
+    _args = _p.parse_args()
+    check_and_install(auto_install=_args.install)

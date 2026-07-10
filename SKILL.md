@@ -1,7 +1,7 @@
 ---
 name: statdata-transfer
 cn_name: 统计数据格式转换器 
-description: "读入 28+ 统计软件格式，100% 保留变量标签/值标签/缺失值等全部元数据；支持任意格式互转（SPSS↔Stata↔R↔SAS↔Excel↔Parquet↔HDF5↔JSON…），双向无损。Read 28+ stats formats with full metadata; bidirectionally convert between any formats (SPSS↔Stata↔R↔SAS↔Excel↔Parquet…). See README.md / README_ZH.md for details."
+description: "读入 28+ 统计软件格式；对统计二进制格式（SPSS/Stata/SAS/R/Excel/Parquet/HDF5…）完整保留变量标签/值标签/缺失值等元数据，文本格式（CSV/XML/HTML/ODS）与 JSON 仅保留可保留的子集（详见格式限制）；支持任意格式双向互转。Read 28+ stats formats; preserves full metadata for statistical binary formats and a subset for text/JSON formats (see format limits); bidirectionally convert between any formats (SPSS↔Stata↔R↔SAS↔Excel↔Parquet…). See README.md / README_ZH.md for details."
 triggers:
   - "statdata-transfer"
   - "统计数据格式转换"
@@ -14,7 +14,7 @@ metadata:
   {
     "openclaw": { "emoji": "🛠️", "icon": "assets/icon.svg"},
     "authors": ["medstatstar", "phoe-zip"],
-    "version": "1.8.2",
+    "version": "1.8.3",
     "license": "MIT",
     "tags": ["data-conversion", "statistics", "spss", "stata", "sas", "clinical-trials", "metadata", "pandas", "bidirectional"],
     "homepage": "https://github.com/medstatstar/statdata-transfer",
@@ -29,12 +29,18 @@ metadata:
 
 | 能力 | 说明 | Ability | Description |
 |------|------|---------|-------------|
-| 读入 | SPSS/Stata/SAS 100% 保留变量标签、值标签、缺失值等全部元数据 | Read | SPSS/Stata/SAS: 100% preserve all metadata |
+| 读入 | SPSS/Stata/SAS 等统计二进制格式完整保留变量标签、值标签、缺失值等元数据（文本/JSON 仅保留子集） | Read | Statistical binary formats fully preserve labels/value-labels/missing; text/JSON keep a subset |
 | 转存 | 任意格式互转（.sav ↔ .dta ↔ .rda ↔ .xlsx ↔ .parquet 等） | Convert | Bidirectional conversion between any formats |
 | 元数据嵌入 | Parquet/Feather/HDF5/JSON 通过 schema.metadata 保留标签 | Embed | Arrow/HDF5/JSON embed labels in schema.metadata |
 | 丢失警告 | 转换时自动检测并报告元数据损失 | Warn | Automatic metadata-loss warnings on conversion |
 | P0 修复 | R 对象读入、CSV 重复读取、值标签键还原等 | P0 Fixes | R object read, CSV dedup, value-label key restore |
 | EpiInfo/ARFF/Gretl | 新增 3 种流行病学/ML/计量格式读入 | EpiInfo/ARFF/Gretl | New epidemiology/ML/econometrics format readers |
+
+## 安全说明 | Security Notes
+
+- **R 子进程**：读取 `.rda/.rds/.RData` 时，技能调用本地 R（`Rscript`）并把数据写出为临时 CSV 桥接读回。R 脚本为**静态模板**，文件路径/对象名均通过命令行参数传入（非字符串拼接），杜绝命令注入；临时文件使用随机名，不落固定路径。
+- **可选环境安装**：依赖缺失时需显式以 `python scripts/check_env.py --install` 运行才会安装包；默认仅检测、不修改 Python 环境。
+- **适用边界**：仅用于你信任的文件。文本格式（CSV/XML/HTML/ODS）与 JSON 仅保留部分元数据，详见「格式限制」。
 
 ## 推荐场景 | Recommended Use Cases
 

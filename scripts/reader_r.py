@@ -17,6 +17,130 @@ import pyreadr
 
 from .reader_core import (ColumnInfo, RMeta, StatFileResult, _bilingual, _calc_missing_pct, _get_source_type, _build_column_report, _build_metadata)
 
+
+# ============================================================
+# 安全辅助：以「写临时 .R 脚本 + 命令行参数」方式运行 R
+# ============================================================
+def _run_r_script(rscript_path: str, script_body: str, *args: str, timeout: int = 120):
+    """将**完全静态**的 R 脚本写入临时文件，用 `Rscript script.R <args...>` 运行。
+
+    安全要点：脚本体不得内插任何不可信输入（文件路径、对象名等），
+    所有动态值通过命令行参数 (R 内 commandArgs(trailingOnly=TRUE)) 传入，
+    从而消除把用户输入拼进可执行 R 代码造成的命令注入风险。
+    """
+    fd, script_path = tempfile.mkstemp(suffix=".R", prefix="statdata_r_")
+    os.close(fd)
+    try:
+        with open(script_path, "w", encoding="utf-8") as f:
+            f.write(script_body)
+        cmd = [rscript_path, script_path] + [str(a) for a in args]
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=timeout,
+            encoding="utf-8", errors="replace",
+        )
+    finally:
+        try:
+            os.unlink(script_path)
+        except OSError:
+            pass
+    return result
+
+
+# 静态 R 脚本：读 R 文件（RDS 或 RDA）并抽取元数据 + 写出 CSV
+# 注意：脚本体不含任何用户输入；filepath/对象名/输出路径均经 argv 传入。
+_R_READ_SCRIPT = r"""
+args <- commandArgs(trailingOnly=TRUE)
+filepath <- args[1]
+obj_name <- args[2]
+out_csv <- args[3]
+fmt <- args[4]
+has_obj_name <- (!is.na(obj_name) && nchar(obj_name) > 0)
+extract_meta <- function(obj) {
+  meta1 <- attr(obj, 'stat-full-meta')
+  meta2 <- attr(obj, 'statdata_meta')
+  if (!is.null(meta1)) { writeLines(paste0('STAT_FULL_META:', meta1)) }
+  if (!is.null(meta2) && is.null(meta1)) { writeLines(paste0('STATDATA_META:', meta2)) }
+  lab_attr <- attr(obj, 'label')
+  if (!is.null(lab_attr)) { writeLines(paste0('OBJ_LABEL:', lab_attr)) }
+  if (is.data.frame(obj)) {
+    for (cn in names(obj)) {
+      x <- obj[[cn]]
+      l <- attr(x, 'label'); lv <- attr(x, 'levels'); f <- attr(x, 'format'); u <- attr(x, 'units')
+      if (!is.null(l)) writeLines(paste0('COL_LABEL:', cn, '=', l))
+      if (!is.null(lv)) writeLines(paste0('COL_LEVELS:', cn, '=', paste(lv, collapse=',')))
+      if (!is.null(f)) writeLines(paste0('COL_FORMAT:', cn, '=', f))
+      if (!is.null(u)) writeLines(paste0('COL_UNITS:', cn, '=', u))
+    }
+  }
+}
+if (fmt == "r_rds") {
+  obj <- readRDS(filepath)
+  rname <- ifelse(has_obj_name, obj_name, "obj")
+  if (!is.data.frame(obj)) { obj <- as.data.frame(obj) }
+  extract_meta(obj)
+  write.csv(obj, file=out_csv, row.names=TRUE, fileEncoding='UTF-8')
+  writeLines("__R_METADATA__")
+  writeLines(paste('DIM:', dim(obj)[1], dim(obj)[2]))
+  writeLines(paste('OBJS:', rname))
+} else {
+  e <- new.env()
+  load(filepath, envir=e)
+  if (has_obj_name) {
+    if (obj_name %in% ls(e)) { obj <- get(obj_name, envir=e); rname <- obj_name }
+    else { stop(paste0('Object ', obj_name, ' not found. Available: ', paste(ls(e), collapse=', '))) }
+  } else {
+    objs <- ls(e); data <- NULL; objname <- NA
+    for (o in objs) { obj <- get(o, envir=e); if (is.data.frame(obj)) { data <- obj; objname <- o; break } }
+    if (is.null(data)) {
+      obj <- get(objs[1], envir=e)
+      if (is.function(obj) || is.environment(obj)) { data <- tryCatch(as.data.frame(as.list(obj)), error=function(e) NULL) }
+      if (is.null(data)) { data <- as.data.frame(obj) }
+      objname <- objs[1]
+    }
+    obj <- data; rname <- objname
+  }
+  if (!is.data.frame(obj)) { obj <- as.data.frame(obj) }
+  extract_meta(obj)
+  write.csv(obj, file=out_csv, row.names=TRUE, fileEncoding='UTF-8')
+  writeLines("__R_METADATA__")
+  writeLines(paste('DIM:', dim(obj)[1], dim(obj)[2]))
+  writeLines(paste('OBJS:', rname))
+}
+"""
+
+# 静态 R 脚本：仅抽取 statdata_meta 属性（JSON），同样经 argv 传入路径/对象名
+_R_META_SCRIPT = r"""
+args <- commandArgs(trailingOnly=TRUE)
+filepath <- args[1]
+obj_name <- args[2]
+fmt <- args[3]
+has_obj_name <- (!is.na(obj_name) && nchar(obj_name) > 0)
+if (fmt == "r_rds") {
+  obj <- readRDS(filepath)
+} else {
+  e <- new.env()
+  load(filepath, envir=e)
+  if (has_obj_name) {
+    if (obj_name %in% ls(e)) { obj <- get(obj_name, envir=e) } else { stop(paste0('Object ', obj_name, ' not found')) }
+  } else {
+    obj <- get(ls(e)[1], envir=e)
+  }
+}
+meta <- attr(obj, 'statdata_meta')
+if (is.null(meta)) { writeLines("__NOMETA__") } else { writeLines(meta) }
+"""
+
+# 静态 R 脚本：列出 RDA 中的 DataFrame 对象名
+_R_LIST_SCRIPT = r"""
+args <- commandArgs(trailingOnly=TRUE)
+filepath <- args[1]
+e <- new.env()
+load(filepath, envir=e)
+objs <- ls(e)
+for (o in objs) { obj <- get(o, envir=e); if (is.data.frame(obj)) { writeLines(paste0('DF:', o)) } }
+"""
+
+
 # ============================================================
 # R 格式读入（.rda/.rds/.rdata），含 ASCII XDR 回退
 # ============================================================
@@ -118,98 +242,22 @@ def _read_r_via_rscript(filepath: str, format_type: str, object_name: str | None
 
     filepath_r = filepath.replace("\\", "/")
 
-    # 使用项目目录下的临时文件（比系统 TEMP 我更可控，路径也更简单）
-    # R 输出 CSV 文件，Python 用 pandas 读回
-    tmp_csv = os.path.join(os.path.dirname(__file__), '_tmp_r_output.csv')
+    # R 输出 CSV 使用系统临时文件（随机名，避免可预测路径导致的泄露/碰撞）
+    fd, tmp_csv = tempfile.mkstemp(suffix=".csv", prefix="statdata_r_out_")
+    os.close(fd)
     tmp_csv_r = tmp_csv.replace("\\", "/")
 
-    # Extract embedded metadata + column-level attributes from R
-    extract_meta_r = (
-        "extract_meta <- function(obj) { "
-        "  meta1 <- attr(obj, 'stat-full-meta'); "
-        "  meta2 <- attr(obj, 'statdata_meta'); "
-        "  if (!is.null(meta1)) { cat('STAT_FULL_META:', meta1, '\\n') }; "
-        "  if (!is.null(meta2) && is.null(meta1)) { cat('STATDATA_META:', meta2, '\\n') }; "
-        "  lab_attr <- attr(obj, 'label'); "
-        "  if (!is.null(lab_attr)) { cat('OBJ_LABEL:', lab_attr, '\\n') }; "
-        "  # Column-level labels, levels, format, units "
-        "  if (is.data.frame(obj)) { "
-        "    for (cn in names(obj)) { "
-        "      x <- obj[[cn]]; "
-        "      l <- attr(x, 'label'); lv <- attr(x, 'levels'); fmt <- attr(x, 'format'); un <- attr(x, 'units'); "
-        "      if (!is.null(l)) cat(paste0('COL_LABEL:', cn, '=', l, '\\n')); "
-        "      if (!is.null(lv)) cat(paste0('COL_LEVELS:', cn, '=', paste(lv, collapse=','), '\\n')); "
-        "      if (!is.null(fmt)) cat(paste0('COL_FORMAT:', cn, '=', fmt, '\\n')); "
-        "      if (!is.null(un)) cat(paste0('COL_UNITS:', cn, '=', un, '\\n')); "
-        "    } "
-        "  } "
-        "}"
-    )
-
+    # 安全：静态 R 脚本（不含任何用户输入）+ 命令行参数传入路径/对象名，杜绝命令注入。
+    # 临时 CSV 已用 tempfile 创建；R 将结果写出到该路径，Python 再读回。
     try:
-        if format_type == "r_rds":
-            r_cmd = (
-                f"{extract_meta_r}"
-                f"obj <- readRDS('{filepath_r}'); "
-                f"extract_meta(obj); "
-                f"if (!is.data.frame(obj)) {{ obj <- as.data.frame(obj); }}; "
-                f"write.csv(obj, file='{tmp_csv_r}', row.names=TRUE, fileEncoding='UTF-8'); "
-                f"cat('\\n__R_METADATA__\\n'); "
-                f"cat(paste('DIM:', dim(obj)[1], dim(obj)[2], '\\n')); "
-                f"cat('OBJS:', deparse(substitute(obj)), '\\n')"
-            )
-        else:
-            if object_name:
-                r_cmd = (
-                    f"{extract_meta_r}"
-                    f"e <- new.env(); "
-                    f"load('{filepath_r}', envir=e); "
-                    f"if ('{object_name}' %in% ls(e)) {{ "
-                    f"  obj <- get('{object_name}', envir=e); "
-                    f"}} else {{ "
-                    f"  stop('Object {object_name} not found. Available: ', paste(ls(e), collapse=', ')); "
-                    f"}}; "
-                    f"extract_meta(obj); "
-                    f"if (!is.data.frame(obj)) {{ obj <- as.data.frame(obj); }}; "
-                    f"write.csv(obj, file='{tmp_csv_r}', row.names=TRUE, fileEncoding='UTF-8'); "
-                    f"cat('\\n__R_METADATA__\\n'); "
-                    f"cat(paste('DIM:', dim(obj)[1], dim(obj)[2], '\\n')); "
-                    f"cat('OBJS:', paste('{object_name}', collapse=' '), '\\n')"
-                )
-            else:
-                r_cmd = (
-                    f"{extract_meta_r}"
-                    f"e <- new.env(); "
-                    f"load('{filepath_r}', envir=e); "
-                    f"objs <- ls(e); "
-                    f"data <- NULL; "
-                    f"objname <- NA; "
-                    f"for (o in objs) {{ "
-                    f"  obj <- get(o, envir=e); "
-                    f"  if (is.data.frame(obj)) {{ data <- obj; objname <- o; break; }} "
-                    f"}}; "
-                    f"if (is.null(data)) {{ "
-                    f"  obj <- get(objs[1], envir=e); "
-                    f"  if (is.function(obj) || is.environment(obj)) {{ "
-                    f"    data <- tryCatch(as.data.frame(as.list(obj)), error=function(e) NULL); "
-                    f"  }}; "
-                    f"  if (is.null(data)) {{ data <- as.data.frame(obj); }}; "
-                    f"  objname <- objs[1]; "
-                    f"}}; "
-                    f"extract_meta(data); "
-                    f"write.csv(data, file='{tmp_csv_r}', row.names=TRUE, fileEncoding='UTF-8'); "
-                    f"cat('\\n__R_METADATA__\\n'); "
-                    f"cat(paste('DIM:', nrow(data), ncol(data), '\\n')); "
-                    f"cat('OBJS:', objname, '\\n')"
-                )
-
-        result = subprocess.run(
-            [rscript_path, "-e", r_cmd],
-            capture_output=True,
-            text=True,
+        result = _run_r_script(
+            rscript_path,
+            _R_READ_SCRIPT,
+            filepath_r,
+            object_name or "",
+            tmp_csv_r,
+            format_type,
             timeout=120,
-            encoding='utf-8',
-            errors='replace',
         )
 
         if result.returncode != 0:
@@ -729,44 +777,15 @@ def _extract_embedded_r_metadata(filepath: str, format_type: str, object_name: s
             return {}
         
         filepath_r = filepath.replace("\\", "/")
-        
-        if format_type == "r_rds":
-            r_cmd = (
-                f"obj <- readRDS('{filepath_r}'); "
-                f"meta <- attr(obj, 'statdata_meta'); "
-                f"if (is.null(meta)) {{ cat('__NOMETA__\\n') }} else {{ cat(meta) }}"
-            )
-        else:
-            if object_name:
-                r_cmd = (
-                    f"e <- new.env(); "
-                    f"load('{filepath_r}', envir=e); "
-                    f"obj <- get('{object_name}', envir=e); "
-                    f"meta <- attr(obj, 'statdata_meta'); "
-                    f"if (is.null(meta)) {{ cat('__NOMETA__\\n') }} else {{ cat(meta) }}"
-                )
-            else:
-                r_cmd = (
-                    f"e <- new.env(); "
-                    f"load('{filepath_r}', envir=e); "
-                    f"objs <- ls(e); "
-                    f"data <- NULL; "
-                    f"for (o in objs) {{ "
-                    f"  obj <- get(o, envir=e); "
-                    f"  if (is.data.frame(obj)) {{ data <- obj; break; }} "
-                    f"}}; "
-                    f"if (is.null(data)) {{ obj <- get(objs[1], envir=e); }}; "
-                    f"meta <- attr(data, 'statdata_meta'); "
-                    f"if (is.null(meta)) {{ cat('__NOMETA__\\n') }} else {{ cat(meta) }}"
-                )
-        
-        result = subprocess.run(
-            [rscript_path, "-e", r_cmd],
-            capture_output=True,
-            text=True,
+
+        # 安全：静态脚本 + 命令行参数传入路径/对象名，杜绝命令注入
+        result = _run_r_script(
+            rscript_path,
+            _R_META_SCRIPT,
+            filepath_r,
+            object_name or "",
+            format_type,
             timeout=60,
-            encoding='utf-8',
-            errors='replace',
         )
         
         if result.returncode != 0 or '__NOMETA__' in result.stdout:
@@ -813,20 +832,13 @@ def read_all_r_objects_inner(filepath: str) -> dict[str, StatFileResult]:
 def _read_all_r_objects_via_rscript(filepath: str, rscript_path: str) -> dict[str, StatFileResult]:
     """Fallback: list all data frames in RDA via R, then extract each."""
     filepath_r = filepath.replace("\\", "/")
-    r_cmd = (
-        f"e <- new.env(); "
-        f"load('{filepath_r}', envir=e); "
-        f"objs <- ls(e); "
-        f"for (o in objs) {{ "
-        f"  obj <- get(o, envir=e); "
-        f"  if (is.data.frame(obj)) {{ cat('DF:', o, '\\n') }} "
-        f"}}"
-    )
-    
-    res = subprocess.run(
-        [rscript_path, "-e", r_cmd],
-        capture_output=True, text=True, timeout=60,
-        encoding="utf-8", errors="replace",
+
+    # 安全：静态脚本 + 命令行参数传入路径，杜绝命令注入
+    res = _run_r_script(
+        rscript_path,
+        _R_LIST_SCRIPT,
+        filepath_r,
+        timeout=60,
     )
     
     df_names = []

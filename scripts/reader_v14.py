@@ -431,19 +431,11 @@ def _read_jamovi(filepath, timestamp):
         with zf.open(csv_files[0]) as f:
             df = pd.read_csv(io.BytesIO(f.read()), encoding="utf-8")
 
-        # 尝试读取 JSON 分析设置
+        # 安全：jamovi 的 .json 为分析设置/笔记等嵌入内容，与数据转换无关，
+        # 且可能包含敏感信息，故不读取、不向外传播（避免意外收集/泄露嵌入内容）。
         analysis = {}
-        for name in zf.namelist():
-            if name.endswith(".json"):
-                try:
-                    with zf.open(name) as f:
-                        analysis[name] = json.loads(f.read().decode("utf-8"))
-                except Exception:
-                    pass
 
     warnings_list.append(_bilingual(f"jamovi 文件包含 {len(csv_files)} 个 CSV 文件，当前仅读入 {csv_files[0]}", f"jamovi file contains {len(csv_files)} CSV files, currently only reading {csv_files[0]}"))
-    if analysis:
-        warnings_list.append(_bilingual(f"jamovi 文件包含 {len(analysis)} 个 JSON 分析文件（已保存到元数据）", f"jamovi file contains {len(analysis)} JSON analysis files (saved to metadata)"))
 
     column_report = _build_column_report(
         df, {"variable_labels": {}}, {}, {}, {}, warnings_list, "jamovi"

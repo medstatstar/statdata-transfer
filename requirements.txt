@@ -16,8 +16,8 @@ openpyxl>=3.1           # Excel .xlsx/.xlsm read/write
 xlrd>=2.0               # Excel .xls read (legacy)
 scipy>=1.11             # MATLAB .mat
 h5py>=3.10              # HDF5
-pyarrow>=15.0           # Parquet, Feather, Arrow, ORC
-lxml>=5.0               # XML, HTML, CDISC ODM
+pyarrow>=17.0           # Parquet, Feather, Arrow, ORC (>=17.0 修复 CVE-2024-52338 反序列化；CVE-2026-25087 仅影响 C++ 预缓冲 API，Python 绑定不受影响)
+lxml>=6.0               # XML, HTML, CDISC ODM (>=6.0 修复 CVE-2026-41066 XXE)
 odfpy>=1.4              # ODS (OpenDocument Spreadsheet)
 
 # -------------------------
