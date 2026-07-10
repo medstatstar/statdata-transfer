@@ -345,9 +345,19 @@ def _read_hdf5(filepath: str, timestamp: str) -> StatFileResult:
         best_ds: dict | None = None
         best_size = -1
         for ds_info in hdf5_metadata["datasets"]:
-            if ds_info.get("size", 0) > best_size and len(ds_info.get("shape", [])) <= 2:
+            shape = ds_info.get("shape", [])
+            if len(shape) > 2:
+                continue
+            size = 1
+            for d in shape:
+                try:
+                    size *= int(d)
+                except (TypeError, ValueError):
+                    size = 0
+                    break
+            if size > best_size:
                 best_ds = ds_info
-                best_size = ds_info["size"]
+                best_size = size
         
         if best_ds is None:
             raise ValueError(_bilingual("HDF5 文件中没有可转换为 DataFrame 的 Dataset", "HDF5 file has no Dataset convertible to DataFrame"))

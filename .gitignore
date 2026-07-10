@@ -1,0 +1,17 @@
+# Python 缓存
+__pycache__/
+*.pyc
+*.pyo
+
+# 测试数据（测试运行时本地生成，不入库）
+test_data/
+
+# 系统垃圾文件
+Thumbs.db
+.DS_Store
+
+# 打包产物
+*.zip
+
+# pytest 缓存
+.pytest_cache/

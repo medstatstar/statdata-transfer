@@ -14,7 +14,7 @@ metadata:
   {
     "openclaw": { "emoji": "🛠️", "icon": "assets/icon.svg"},
     "authors": ["medstatstar", "phoe-zip"],
-    "version": "1.8.0",
+    "version": "1.8.2",
     "license": "MIT",
     "tags": ["data-conversion", "statistics", "spss", "stata", "sas", "clinical-trials", "metadata", "pandas", "bidirectional"],
     "homepage": "https://github.com/medstatstar/statdata-transfer",
@@ -48,10 +48,12 @@ metadata:
 
 ## 触发条件 | Triggers
 
-- 读入 `.dta` `.sav` `.sas7bdat` `.rda` `.xlsx` `.mat` `.h5` `.parquet` `.json` `.xml` 等 28+ 格式 / Read files: `.dta` `.sav` `.sas7bdat` `.rda` `.xlsx` `.mat` `.h5` `.parquet` `.json` `.xml` + 20 more
-- 需要格式转换并保留元数据 / Format conversion with metadata preservation
-- 需要不同统计软件间迁移数据 / Migrate data between statistical software
-- 用户询问各格式读入能力边界 / User asks about format capability limits
+- 读入 `.dta` `.sav` `.sas7bdat` `.rda` `.xlsx` `.mat` `.h5` `.parquet` `.json` `.xml` 等 28+ **统计软件数据格式** / Read statistical data files: `.dta` `.sav` `.sas7bdat` `.rda` `.xlsx` `.mat` `.h5` `.parquet` `.json` `.xml` + 20 more
+- 将统计软件数据文件（`.sav` `.dta` `.sas7bdat` `.rda` `.xpt` 等）转换为另一统计格式并保留变量/值标签 / Convert a statistical-software data file to another stats format while preserving variable/value labels
+- 在 SPSS/Stata/SAS/R 之间迁移带元数据的数据集（非通用文件转换） / Migrate metadata-bearing datasets between SPSS/Stata/SAS/R (not generic file conversion)
+- 用户询问各统计格式读入能力边界 / User asks about statistical format capability limits
+
+> 边界声明 | Scope: 本技能仅处理统计软件数据格式（.sav/.dta/.sas7bdat/.rda/.xpt/...），**不处理**一般文档/表格/图片/媒体的格式转换，避免误激活与无关数据访问。 / Statistical data formats only; not generic document/image/media conversion.
 
 ## 支持格式与能力对照表 | Supported Formats & Capability Matrix
 

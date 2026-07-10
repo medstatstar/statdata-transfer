@@ -78,22 +78,31 @@ def _read_sas(filepath, timestamp, *, format_type, user_missing=True, encoding) 
     )
     all_meta["value_labels"] = value_labels
     
-    # SAS: preserve special_missing and mr_sets from pyreadstat
-    special_missing = _normalize_missing_ranges(all_meta.get("special_missing", {}))
-    mr_sets = _normalize_mr_sets(all_meta.get("mr_sets", {}))
-    
-    if special_missing:
-        warnings_list.append(
-            f"SAS: 保留 {len(special_missing)} 个变量的特殊缺失值信息 | "
-            f"SAS: Preserved {len(special_missing)} variables' special missing info"
-        )
-    if mr_sets:
-        warnings_list.append(f"SAS 读入：保留 {len(mr_sets)} 个多重响应集（MRSETS）")
-    
-    # Normalize missing_ranges and missing_user_values
+    # SAS: pyreadstat 没有 special_missing 属性，需从缺失范围 + 用户缺失值拼接重建
     missing_ranges = _normalize_missing_ranges(all_meta.get("missing_ranges", {}))
     missing_user_values = _normalize_missing_user_values(all_meta.get("missing_user_values", {}))
-    
+    special_missing = {}
+    for varname, ranges in missing_ranges.items():
+        special_missing[varname] = ranges
+    for varname, vals in missing_user_values.items():
+        if varname not in special_missing:
+            special_missing[varname] = vals
+    mr_sets = _normalize_mr_sets(all_meta.get("mr_sets", {}))
+
+    if special_missing:
+        if user_missing:
+            warnings_list.append(
+                f"SAS: 保留 {len(special_missing)} 个变量的特殊缺失值信息 | "
+                f"SAS: Preserved {len(special_missing)} variables' special missing info"
+            )
+        else:
+            warnings_list.append(
+                f"SAS: {len(special_missing)} 个变量的特殊缺失值已转为 NaN（设置 user_missing=True 可保留） | "
+                f"SAS: {len(special_missing)} variables' special missing converted to NaN (set user_missing=True to preserve)"
+            )
+    if mr_sets:
+        warnings_list.append(f"SAS 读入：保留 {len(mr_sets)} 个多重响应集（MRSETS）")
+
     if missing_ranges or missing_user_values:
         if user_missing:
             warnings_list.append(f"SAS 读入：user_missing=True 已保留用户自定义缺失值原始数值")

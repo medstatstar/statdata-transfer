@@ -328,25 +328,49 @@ def _is_stata_special_missing(val: float) -> bool:
 
 def _auto_detect_encoding(filepath: str, *, metadata_only: bool = True) -> str | None:
     """自动检测 SPSS/Stata/SAS 文件的变量标签编码。
-    
-    尝试 GB18030 → GBK → Latin-1 回退链，返回第一个不会抛出异常的编码。
-    metadata_only=True 时仅读取元数据，加快速度。
+
+    优先使用 pyreadstat 从文件头部读出的声明编码（file_encoding），
+    这是最可靠的方式（UTF-8 / GBK / Windows-1252 / ISO-8859-1 等）。
+    仅当声明编码缺失或未知时，才回退到启发式检测链：
+    UTF-8 → GB18030 → GBK → Latin-1，并校验中文标签解码后无乱码（无 U+FFFD）。
     """
-    for enc in ("gb18030", "gbk", "gb2312", "latin1"):
+    def _read_meta(enc=None):
+        if filepath.endswith(".por"):
+            return pyreadstat.read_por(filepath, encoding=enc, metadataonly=metadata_only) if enc else pyreadstat.read_por(filepath, metadataonly=metadata_only)
+        if filepath.endswith((".sav", ".zsav")):
+            return pyreadstat.read_sav(filepath, encoding=enc, metadataonly=metadata_only) if enc else pyreadstat.read_sav(filepath, metadataonly=metadata_only)
+        if filepath.endswith(".dta"):
+            return pyreadstat.read_dta(filepath, encoding=enc, metadataonly=metadata_only) if enc else pyreadstat.read_dta(filepath, metadataonly=metadata_only)
+        if filepath.endswith(".sas7bdat"):
+            return pyreadstat.read_sas7bdat(filepath, encoding=enc, metadataonly=metadata_only) if enc else pyreadstat.read_sas7bdat(filepath, metadataonly=metadata_only)
+        if filepath.endswith(".xpt"):
+            return pyreadstat.read_xport(filepath, encoding=enc, metadataonly=metadata_only) if enc else pyreadstat.read_xport(filepath, metadataonly=metadata_only)
+        return None
+
+    # 1) 优先使用文件声明的编码（最可靠）
+    try:
+        res = _read_meta()
+        if res is not None:
+            _, m0 = res
+            declared = getattr(m0, "file_encoding", None)
+            if declared and str(declared).strip().lower() not in ("none", "unknown", ""):
+                return str(declared)
+    except Exception:
+        pass
+
+    # 2) 启发式回退：UTF-8 优先（现代文件默认），再 CJK，最后 Latin-1
+    for enc in ("utf-8", "gb18030", "gbk", "latin1"):
         try:
-            if filepath.endswith((".sav", ".zsav", ".por")):
-                _, m = pyreadstat.read_sav(filepath, encoding=enc, metadataonly=metadata_only)
-            elif filepath.endswith(".dta"):
-                _, m = pyreadstat.read_dta(filepath, encoding=enc, metadataonly=metadata_only)
-            elif filepath.endswith((".sas7bdat", ".xpt")):
-                _, m = pyreadstat.read_sas7bdat(filepath, encoding=enc, metadataonly=metadata_only) if filepath.endswith(".sas7bdat") else pyreadstat.read_xport(filepath, encoding=enc, metadataonly=metadata_only)
-            else:
-                return None
-            # Quick check: try to decode a sample label if available
+            res = _read_meta(enc)
+            if res is None:
+                continue
+            _, m = res
             labels = getattr(m, "column_names_to_labels", {}) or {}
             for v in labels.values():
-                if isinstance(v, str):
-                    v.encode(enc)
+                if isinstance(v, str) and any(ord(c) > 127 for c in v):
+                    if "�" in v or "\ufffd" in v:
+                        raise UnicodeDecodeError(enc, b"", 0, 0, "replacement char in label")
+                    v.encode(enc)  # 中文标签应可正常编码
             return enc
         except Exception:
             continue
@@ -804,6 +828,9 @@ def read_all_sheets(filepath: str, encoding: str | None = None) -> dict[str, Sta
         raise ValueError("Excel 文件不包含任何工作表")
 
     for name in sheet_names:
+        # 跳过本技能写出的辅助工作表（_col_labels / _val_labels）
+        if name.startswith("_"):
+            continue
         result = reader_excel._read_excel(filepath, timestamp,
                                           format_type=f"excel_{ext[1:]}",
                                           encoding=encoding,

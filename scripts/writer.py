@@ -456,7 +456,16 @@ def _write_xpt(df, filepath, metadata=None):
     
     var_labels = _get_variable_labels(metadata)
     column_labels = [var_labels.get(col, col)[:40] for col in df.columns]
-    pyreadstat.write_xport(df, filepath, column_labels=column_labels)
+    val_labels = _get_value_labels(metadata)
+    variable_value_labels = _pyreadstat_value_labels(val_labels, list(df.columns))
+    file_label = (metadata.get("file_label", "") or "")[:40] if metadata else ""
+    xpt_kwargs = {"column_labels": column_labels}
+    if variable_value_labels:
+        xpt_kwargs["variable_value_labels"] = variable_value_labels
+    if file_label:
+        xpt_kwargs["file_label"] = file_label
+    pyreadstat.write_xport(df, filepath, **xpt_kwargs)
+    return []
 
 
 # ============================================================
@@ -642,8 +651,10 @@ def write_stat_file(dataframe, filepath, metadata=None, **kwargs):
     if metadata and ext in {".parquet", ".feather", ".orc", ".fst", ".hdf5", ".json", ".xlsx", ".xls", ".csv", ".tsv"}:
         warnings = _check_non_stat_target_loss(metadata)
     
-    writer_func(dataframe, filepath, metadata or {}, **kwargs)
-    
+    writer_warnings = writer_func(dataframe, filepath, metadata or {}, **kwargs)
+    if writer_warnings:
+        warnings.extend(writer_warnings)
+
     return warnings
 
 

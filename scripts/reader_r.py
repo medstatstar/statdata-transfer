@@ -848,6 +848,9 @@ def _read_all_r_objects_via_rscript(filepath: str, rscript_path: str) -> dict[st
             results[name] = _read_r_single(result_r[name], name, timestamp)
     
     return results
+
+
+def _convert_r_object_to_dataframe(obj, obj_name):
     """尝试将 R 对象转换为 DataFrame"""
     warnings_list = []
     if isinstance(obj, pd.DataFrame):
