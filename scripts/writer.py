@@ -283,6 +283,71 @@ def _write_stata(df, filepath, metadata=None, *, version=15):
 # R .rda / .rds 写入（通过 R subprocess）
 # ============================================================
 
+
+
+# ============================================================
+# 安全辅助：以「写临时 .R 脚本 + 命令行参数」方式运行 R
+# 与 reader_r.py / reader_v14.py 的 _run_r_script 保持一致模式（消除命令注入）。
+# ============================================================
+def _run_r_script(rscript_path, script_body, *args, timeout=120):
+    """将**完全静态**的 R 脚本写入临时文件，用 `Rscript script.R <args...>` 运行。
+
+    安全要点：脚本体不得内插任何不可信输入（文件路径、标签、元数据等），
+    所有动态值通过命令行参数 (R 内 commandArgs(trailingOnly=TRUE)) 传入，
+    从而消除把用户输入拼进可执行 R 代码造成的命令注入风险。
+    """
+    fd, script_path = tempfile.mkstemp(suffix=".R", prefix="statdata_r_")
+    os.close(fd)
+    try:
+        with open(script_path, "w", encoding="utf-8") as f:
+            f.write(script_body)
+        cmd = [rscript_path, script_path] + [str(a) for a in args]
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=timeout,
+            encoding="utf-8", errors="replace",
+        )
+    finally:
+        try:
+            os.unlink(script_path)
+        except OSError:
+            pass
+    return result
+
+
+# 静态 R 脚本：经 argv 接收 csv 路径 / 输出路径 / save_func / 标签JSON / 元数据JSON，
+# 用 jsonlite 解析后把标签作为数据（非代码）赋给各列，绝不内插用户输入。
+_R_WRITE_SCRIPT = r"""
+args <- commandArgs(trailingOnly=TRUE)
+csv_path <- args[1]
+out_path <- args[2]
+save_func <- args[3]
+labels_json <- args[4]
+full_meta_json <- args[5]
+library(jsonlite)
+df <- read.csv(csv_path, stringsAsFactors=FALSE, fileEncoding='UTF-8')
+lab <- fromJSON(labels_json, simplifyVector=FALSE)
+if (!is.null(lab$var_labels)) {
+  for (col in names(lab$var_labels)) {
+    if (col %in% names(df)) {
+      v <- lab$var_labels[[col]]
+      if (!is.null(v) && length(v) > 0) { attr(df[[col]], "label") <- as.character(v) }
+    }
+  }
+}
+if (!is.null(lab$val_labels)) {
+  for (col in names(lab$val_labels)) {
+    if (col %in% names(df)) {
+      lv <- lab$val_labels[[col]]
+      if (!is.null(lv) && length(lv) > 0) {
+        attr(df[[col]], "labels") <- unlist(lv, use.names=TRUE)
+        class(df[[col]]) <- c("labelled", "integer")
+      }
+    }
+  }
+}
+if (nchar(full_meta_json) > 0) { attr(df, "statdata_meta") <- full_meta_json }
+if (save_func == "saveRDS") { saveRDS(df, out_path) } else { save(df, file=out_path) }
+"""
 def _write_r_via_subprocess(df, filepath, metadata=None, object_name="df", save_func="save"):
     """通过 R subprocess 写入 R 格式文件，并将全部 17 个元数据字段保存为 R 数据属性"""
     from .reader_r import _check_r_available
@@ -294,70 +359,29 @@ def _write_r_via_subprocess(df, filepath, metadata=None, object_name="df", save_
     filepath_fwd = filepath.replace("\\", "/")
     tmp_csv = tempfile.NamedTemporaryFile(suffix='.csv', delete=False, mode='w', encoding='utf-8')
     tmp_csv.close()
-    r_script_file = None
-    
+
     try:
         df.to_csv(tmp_csv.name, index=False, encoding='utf-8')
         csv_fwd = tmp_csv.name.replace("\\", "/")
-        
-        orig_cols = list(df.columns)
+
         var_labels = _get_variable_labels(metadata)
         val_labels = _get_value_labels(metadata)
-
         full_meta = _build_full_meta(metadata)
-        
-        r_lines = [
-            "options(encoding='UTF-8')",
-            f"df <- read.csv('{csv_fwd}', stringsAsFactors=FALSE, fileEncoding='UTF-8')",
-        ]
-        
-        # 跳过自动修改列名：保持原列名
-        make_names_orig = []
-        for col in orig_cols:
-            if col != col.strip():
-                make_names_orig.append(col)
-        
-        # 赋值标签到每列
-        for col, lab in var_labels.items():
-            if col in orig_cols:
-                lab_esc = lab.replace("\\", "\\\\").replace('"', '\\"').replace("\n", " ")
-                r_lines.append(f'attr(df[["{col}"]], "label") <- "{lab_esc}"')
-        
-        # 值标签
-        for col, labels_dict in val_labels.items():
-            if col in orig_cols:
-                int_items = []
-                for v, l in labels_dict.items():
-                    if isinstance(v, (int, float)):
-                        l_esc = str(l).replace('"', '\\"')
-                        int_items.append(f'`{int(v)}` = "{l_esc}"')
-                if int_items:
-                    r_lines.append(f'attr(df[["{col}"]], "labels") <- c({", ".join(int_items)})')
-                    r_lines.append(f'class(df[["{col}"]]) <- c("labelled", "integer")')
-        
-        # 保存 all 17 metadata fields as JSON in dataframe attributes
-        if full_meta:
-            meta_json_str = json.dumps(full_meta, ensure_ascii=False).replace("\\", "\\\\").replace('"', '\\"')
-            r_lines.append(f'attr(df, "statdata_meta") <- "{meta_json_str}"')
-        
-        # 保存
-        if save_func == "saveRDS":
-            r_lines.append(f"saveRDS(df, '{filepath_fwd}')")
-        else:
-            r_lines.append(f"save(df, file='{filepath_fwd}')")
-        
-        r_script = "\n".join(r_lines)
-        
-        r_script_file = tempfile.NamedTemporaryFile(mode='w', suffix='.R', delete=False, encoding='utf-8')
-        r_script_file.write(r_script)
-        r_script_file.close()
-        
-        result = subprocess.run([r_exe, r_script_file.name], capture_output=True, text=True, timeout=120)
-        
+
+        # 将所有用户派生字符串打包为 JSON，经 argv 传入 R（避免把用户输入内插进 R 代码造成注入）
+        labels_payload = json.dumps(
+            {"var_labels": var_labels, "val_labels": val_labels},
+            ensure_ascii=False,
+        )
+        full_meta_json = json.dumps(full_meta, ensure_ascii=False) if full_meta else ""
+
+        result = _run_r_script(
+            r_exe, _R_WRITE_SCRIPT,
+            csv_fwd, filepath_fwd, save_func, labels_payload, full_meta_json,
+        )
         if result.returncode != 0:
             err = result.stderr.strip()
-            if "Execution halted" in err or "Error" in err.split("\n")[-1]:
-                raise RuntimeError(_bilingual(f"R 写入失败: {err}", f"R write failed: {err}"))
+            raise RuntimeError(_bilingual(f"R 写入失败: {err}", f"R write failed: {err}"))
     
     except Exception as e:
         if isinstance(e, RuntimeError):
@@ -365,8 +389,6 @@ def _write_r_via_subprocess(df, filepath, metadata=None, object_name="df", save_
         raise RuntimeError(_bilingual(f"R 写入失败: {e}", f"R write failed: {e}"))
     
     finally:
-        if r_script_file and os.path.exists(r_script_file.name):
-            os.unlink(r_script_file.name)
         if os.path.exists(tmp_csv.name):
             os.unlink(tmp_csv.name)
 

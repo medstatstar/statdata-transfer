@@ -14,7 +14,7 @@ metadata:
   {
     "openclaw": { "emoji": "🛠️", "icon": "assets/icon.svg"},
     "authors": ["medstatstar", "phoe-zip"],
-    "version": "1.8.3",
+    "version": "1.8.4",
     "license": "MIT",
     "tags": ["data-conversion", "statistics", "spss", "stata", "sas", "clinical-trials", "metadata", "pandas", "bidirectional"],
     "homepage": "https://github.com/medstatstar/statdata-transfer",
@@ -38,7 +38,7 @@ metadata:
 
 ## 安全说明 | Security Notes
 
-- **R 子进程**：读取 `.rda/.rds/.RData` 时，技能调用本地 R（`Rscript`）并把数据写出为临时 CSV 桥接读回。R 脚本为**静态模板**，文件路径/对象名均通过命令行参数传入（非字符串拼接），杜绝命令注入；临时文件使用随机名，不落固定路径。
+- **R 子进程（全部桥接路径）**：读取 `.rda/.rds/.RData`、`.mtw`（Minitab）、`.rec`（EpiData），以及写出 `.rda/.rds` 时，技能均调用本地 R（`Rscript`）桥接。所有 R 脚本均为**完全静态模板**，文件路径、对象名、变量标签、值标签、元数据等**全部经命令行参数传入**（`commandArgs(trailingOnly=TRUE)`，由 `jsonlite` 解析），**绝不把任何用户输入拼进可执行 R 代码**，从根上消除命令注入；临时脚本/CSV 使用随机名，不落固定路径。
 - **可选环境安装**：依赖缺失时需显式以 `python scripts/check_env.py --install` 运行才会安装包；默认仅检测、不修改 Python 环境。
 - **适用边界**：仅用于你信任的文件。文本格式（CSV/XML/HTML/ODS）与 JSON 仅保留部分元数据，详见「格式限制」。
 

@@ -15,7 +15,7 @@ from typing import Any
 import pandas as pd
 import pyreadr
 
-from .reader_core import (ColumnInfo, RMeta, StatFileResult, _bilingual, _calc_missing_pct, _get_source_type, _build_column_report, _build_metadata)
+from .reader_core import (ColumnInfo, RMeta, StatFileResult, _bilingual, _calc_missing_pct, _get_source_type, _build_column_report, _build_metadata, _parse_value_labels)
 
 
 # ============================================================

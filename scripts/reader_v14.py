@@ -265,33 +265,69 @@ def _read_minitab(filepath, timestamp, *, format_type):
 
 
 
-def _read_minitab_via_r(filepath, timestamp, format_type, rscript_path):
-    """通过 R foreign::read.mtb() 中继读入 Minitab 文件。"""
-    import tempfile, subprocess, pandas as pd, os
 
-    tmp_csv = tempfile.NamedTemporaryFile(suffix=".csv", delete=False)
-    tmp_csv.close()
-    tmp_csv_r = tmp_csv.name.replace("\\", "/")
-    filepath_r = filepath.replace("\\", "/")
 
-    r_cmd = (
-        f"library(foreign); "
-        f"data <- read.mtb('{filepath_r}'); "
-        f"write.csv(data, file='{tmp_csv_r}', row.names=FALSE, fileEncoding='UTF-8')"
-    )
+# ============================================================
+# 安全辅助：以「写临时 .R 脚本 + 命令行参数」方式运行 R
+# 与 reader_r.py 的 _run_r_script 保持一致模式（消除命令注入）。
+# ============================================================
+def _run_r_script(rscript_path, script_body, *args, timeout=120):
+    """将**完全静态**的 R 脚本写入临时文件，用 `Rscript script.R <args...>` 运行。
 
+    安全要点：脚本体不得内插任何不可信输入（文件路径等），
+    所有动态值通过命令行参数 (R 内 commandArgs(trailingOnly=TRUE)) 传入，
+    从而消除把用户输入拼进可执行 R 代码造成的命令注入风险。
+    """
+    fd, script_path = tempfile.mkstemp(suffix=".R", prefix="statdata_r_")
+    os.close(fd)
     try:
+        with open(script_path, "w", encoding="utf-8") as f:
+            f.write(script_body)
+        cmd = [rscript_path, script_path] + [str(a) for a in args]
         result = subprocess.run(
-            [rscript_path, "-e", r_cmd],
-            capture_output=True, text=True, timeout=120,
+            cmd, capture_output=True, text=True, timeout=timeout,
             encoding="utf-8", errors="replace",
         )
-        if result.returncode != 0:
-            raise RuntimeError(_bilingual(f"R 执行失败:\\n{result.stderr[:500]}", f"R execution failed:\\n{result.stderr[:500]}"))
-        df = pd.read_csv(tmp_csv.name, encoding="utf-8")
     finally:
         try:
-            os.unlink(tmp_csv.name)
+            os.unlink(script_path)
+        except OSError:
+            pass
+    return result
+
+
+# 静态 R 脚本：经 foreign::read.mtb() 读 Minitab 并写 CSV。
+# filepath / out_csv 均经 argv 传入，脚本不含任何用户输入。
+_R_MINITAB_SCRIPT = r"""
+args <- commandArgs(trailingOnly=TRUE)
+filepath <- args[1]
+out_csv <- args[2]
+library(foreign)
+data <- read.mtb(filepath)
+write.csv(data, file=out_csv, row.names=FALSE, fileEncoding='UTF-8')
+"""
+
+# 静态 R 脚本：经 foreign::read.epiinfo() 读 EpiData 并写 CSV。
+_R_EPIDATA_SCRIPT = r"""
+args <- commandArgs(trailingOnly=TRUE)
+filepath <- args[1]
+out_csv <- args[2]
+library(foreign)
+data <- read.epiinfo(filepath)
+write.csv(data, file=out_csv, row.names=FALSE, fileEncoding='UTF-8')
+"""
+def _read_minitab_via_r(filepath, timestamp, format_type, rscript_path):
+    """通过 R foreign::read.mtb() 中继读入 Minitab 文件。"""
+    import pandas as pd
+
+    fd, tmp_csv = tempfile.mkstemp(suffix=".csv", prefix="statdata_mtb_")
+    os.close(fd)
+    try:
+        _run_r_script(rscript_path, _R_MINITAB_SCRIPT, filepath, tmp_csv)
+        df = pd.read_csv(tmp_csv, encoding="utf-8")
+    finally:
+        try:
+            os.unlink(tmp_csv)
         except Exception:
             pass
 
@@ -507,31 +543,16 @@ def _read_epidata(filepath, timestamp):
 
 def _read_epidata_via_r(filepath, timestamp, rscript_path):
     """通过 R foreign::read.epiinfo() 中继读入 EpiData .rec 文件。"""
-    import tempfile, subprocess, pandas as pd, os
+    import pandas as pd
 
-    tmp_csv = tempfile.NamedTemporaryFile(suffix=".csv", delete=False)
-    tmp_csv.close()
-    tmp_csv_r = tmp_csv.name.replace("\\", "/")
-    filepath_r = filepath.replace("\\", "/")
-
-    r_cmd = (
-        f"library(foreign); "
-        f"data <- read.epiinfo('{filepath_r}'); "
-        f"write.csv(data, file='{tmp_csv_r}', row.names=FALSE, fileEncoding='UTF-8')"
-    )
-
+    fd, tmp_csv = tempfile.mkstemp(suffix=".csv", prefix="statdata_epi_")
+    os.close(fd)
     try:
-        result = subprocess.run(
-            [rscript_path, "-e", r_cmd],
-            capture_output=True, text=True, timeout=120,
-            encoding="utf-8", errors="replace",
-        )
-        if result.returncode != 0:
-            raise RuntimeError(_bilingual(f"R 执行失败:\\n{result.stderr[:500]}", f"R execution failed:\\n{result.stderr[:500]}"))
-        df = pd.read_csv(tmp_csv.name, encoding="utf-8")
+        _run_r_script(rscript_path, _R_EPIDATA_SCRIPT, filepath, tmp_csv)
+        df = pd.read_csv(tmp_csv, encoding="utf-8")
     finally:
         try:
-            os.unlink(tmp_csv.name)
+            os.unlink(tmp_csv)
         except Exception:
             pass
 
