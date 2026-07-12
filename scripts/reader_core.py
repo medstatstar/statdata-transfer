@@ -529,6 +529,7 @@ def _build_metadata(all_meta: dict, format_name: str, extra: dict | None = None,
     meta["variable_labels"] = all_meta.get("variable_labels", {})
     meta["value_labels"] = all_meta.get("value_labels", {})
     meta["special_missing"] = all_meta.get("special_missing", {})
+    meta["measurement_levels"] = all_meta.get("measurement_levels", {})
     meta["date_origin"] = DATE_ORIGINS.get(format_name)
     meta["file_encoding"] = all_meta.get("file_encoding")
     meta["file_label"] = all_meta.get("file_label")
@@ -701,7 +702,7 @@ def read_stat_file(
     from . import (
         reader_spss, reader_sas, reader_stata, reader_r,
         reader_excel, reader_science, reader_modern, reader_odm,
-        reader_v14, reader_epinfo, reader_arff, reader_gretl,
+        reader_v14, reader_epinfo, reader_arff, reader_gretl, reader_tableau,
     )
 
     ext = os.path.splitext(filepath)[1].lower()
@@ -732,6 +733,9 @@ def read_stat_file(
         ".arff": "arff_arff",       # Weka ARFF
         ".gdt": "gretl_gdt",        # Gretl data
         ".gdtb": "gretl_gdtb",      # Gretl binary data (hint only)
+        ".hyper": "tableau_hyper",  # Tableau Hyper extract
+        ".twbx": "tableau_twbx",    # Tableau packaged workbook (zip; embeds .hyper)
+        ".twb": "tableau_twb",      # Tableau workbook XML (no embedded data)
     }
 
     file_format = format_map.get(ext)
@@ -799,6 +803,9 @@ def read_stat_file(
         "arff_arff": lambda: reader_arff._read_arff(filepath, timestamp),
         "gretl_gdt": lambda: reader_gretl._read_gdt(filepath, timestamp),
         "gretl_gdtb": lambda: _read_gretl_gdtb_hint(filepath),  # .gdtb needs Gretl export
+        "tableau_hyper": lambda: reader_tableau._read_hyper(filepath, timestamp),
+        "tableau_twbx": lambda: reader_tableau._read_twbx(filepath, timestamp),
+        "tableau_twb": lambda: reader_tableau._read_twb(filepath, timestamp),
     }
 
     return handlers[file_format]()

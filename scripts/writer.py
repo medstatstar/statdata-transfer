@@ -605,6 +605,12 @@ def _write_json(df, filepath, metadata=None, *, orient="records"):
         json.dump(output, f, ensure_ascii=False, indent=2)
 
 
+def _write_hyper_dispatch(df, filepath, metadata=None, **kwargs):
+    """Write .hyper via reader_tableau (lazy import: tableauhyperapi only needed for .hyper)."""
+    from . import reader_tableau
+    return reader_tableau._write_hyper(df, filepath, metadata, **kwargs)
+
+
 # ============================================================
 # 统一写入入口
 # ============================================================
@@ -625,6 +631,7 @@ _SUPPORT_WRITERS = {
     ".h5": _write_hdf5,
     ".hdf5": _write_hdf5,
     ".json": _write_json,
+    ".hyper": _write_hyper_dispatch,
 }
 
 

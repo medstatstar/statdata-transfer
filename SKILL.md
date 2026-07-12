@@ -1,7 +1,7 @@
 ---
 name: statdata-transfer
 cn_name: 统计数据格式转换器 
-description: "读入 28+ 统计软件格式；对统计二进制格式（SPSS/Stata/SAS/R/Excel/Parquet/HDF5…）完整保留变量标签/值标签/缺失值等元数据，文本格式（CSV/XML/HTML/ODS）与 JSON 仅保留可保留的子集（详见格式限制）；支持任意格式双向互转。Read 28+ stats formats; preserves full metadata for statistical binary formats and a subset for text/JSON formats (see format limits); bidirectionally convert between any formats (SPSS↔Stata↔R↔SAS↔Excel↔Parquet…). See README.md / README_ZH.md for details."
+description: "读入 29+ 统计软件格式（含 Tableau Hyper .hyper / .twbx 打包工作簿）；对统计二进制格式（SPSS/Stata/SAS/R/Excel/Parquet/HDF5…）完整保留变量标签/值标签/缺失值等元数据，文本格式（CSV/XML/HTML/ODS）与 JSON 仅保留可保留的子集（详见格式限制）；支持任意格式双向互转。Read 29+ stats formats (incl. Tableau Hyper .hyper / .twbx packaged workbook); preserves full metadata for statistical binary formats and a subset for text/JSON formats (see format limits); bidirectionally convert between any formats (SPSS↔Stata↔R↔SAS↔Excel↔Parquet↔Tableau Hyper/.twbx…). See README.md / README_ZH.md for details."
 triggers:
   - "statdata-transfer"
   - "统计数据格式转换"
@@ -14,7 +14,7 @@ metadata:
   {
     "openclaw": { "emoji": "🛠️", "icon": "assets/icon.svg"},
     "authors": ["medstatstar", "phoe-zip"],
-    "version": "1.8.4",
+    "version": "1.9.0",
     "license": "MIT",
     "tags": ["data-conversion", "statistics", "spss", "stata", "sas", "clinical-trials", "metadata", "pandas", "bidirectional"],
     "homepage": "https://github.com/medstatstar/statdata-transfer",
@@ -77,6 +77,8 @@ metadata:
 | GraphPad Prism | `.pzfx` `.pz` | pzfx | ✗ | ✗ | ✗ | ✗ | ⚠️ Multi-table |
 | Gretl | `.gdt` `.gdtb` | built-in | ✅ | ✅(tables) | ✗ | ✗ | ✅ string-tables |
 | HDF5 | `.h5` `.hdf5` | h5py | ✗ | ✗ | ✗ | ✗ | ⚠️ Hierarchy, attrs on write |
+| Tableau Hyper | `.hyper` | tableauhyperapi | ✗ | ✗ | ✗ | ✗ | ⚠️ Column types (schema); statdata_meta side-table for labels |
+| Tableau 打包工作簿 | `.twbx` | (解包 + tableauhyperapi) | ✗ | ✗ | ✗ | ✗ | ⚠️ 解包提取内嵌 `.hyper` 读数据；仅 `.hyper` 提取含数据，`.tde` 旧格式暂不支持，`.twb` 工作簿 XML 本身不含数据 |
 | HTML | `.html` | lxml | ✗ | ✗ | ✗ | ✗ | ⚠️ Tables only |
 | jamovi | `.omv` | ZIP built-in | ✅ | ✅ | ✗ | ✗ | ✅ JSON analysis |
 | JMP | `.jmp` | jmpio-python | ⚠️ | ⚠️ | ✗ | ✗ | ⚠️ Multi-table |
@@ -141,7 +143,7 @@ requires:
   bins: [python3]
   packages:
     core: [pyreadstat>=1.3.5, pyreadr, pandas]
-    extended: [openpyxl, xlrd, scipy, h5py, pyarrow, lxml, odfpy]
+    extended: [openpyxl, xlrd, scipy, h5py, pyarrow, lxml, odfpy, tableauhyperapi]
     optional: [jmpio-python, mtbpy, pzfx]
 ```
 

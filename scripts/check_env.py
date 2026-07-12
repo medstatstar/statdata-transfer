@@ -23,6 +23,8 @@ REQUIRED_PACKAGES = {
     # v1.4 新增
     "jmpio": "jmpio-python",
     "pzfx": "pzfx",
+    # v1.9 新增
+    "tableauhyperapi": "tableauhyperapi",  # Tableau Hyper .hyper (ships native libhyper binary)
 }
 
 def check_and_install(auto_install: bool = False):

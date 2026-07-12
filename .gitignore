@@ -15,3 +15,7 @@ Thumbs.db
 
 # pytest 缓存
 .pytest_cache/
+
+# Tableau Hyper 引擎运行日志（测试时由 HyperProcess 在 CWD 生成）
+hyperd.log
+hyperd*.log
