@@ -189,23 +189,26 @@ def _read_twbx(filepath: str, timestamp: str) -> StatFileResult:
     """Read a Tableau packaged workbook (.twbx).
 
     A .twbx is a zip archive containing a .twb workbook (XML definition, no
-    data) plus one or more embedded data extracts — usually ``.hyper`` files.
-    We unpack the embedded ``.hyper`` extract(s) to a temp dir and delegate to
-    :func:`_read_hyper`, returning the first extract's data (the rest are
-    listed in warnings). Legacy ``.tde`` extracts are detected but not read.
+    data) plus one or more embedded data extracts.  Typical layouts:
+
+    * 现代的 Tableau 打包工作簿内嵌一个或多个 ``.hyper`` 文件（优先读取）。
+    * 部分旧版 / 特殊 .twbx 可能内嵌一个 MS Access 数据库（ ``.mdb`` / ``.accdb``）。
     """
     warnings_list: list[str] = []
     with zipfile.ZipFile(filepath) as z:
         names = z.namelist()
     hyper_entries = [n for n in names if n.lower().endswith(".hyper")]
     tde_entries = [n for n in names if n.lower().endswith(".tde")]
+    mdb_entries = [n for n in names if n.lower().endswith(".mdb")]
+    accdb_entries = [n for n in names if n.lower().endswith(".accdb")]
+    embedded_access = mdb_entries + accdb_entries
 
-    if not hyper_entries:
+    if not hyper_entries and not embedded_access:
         raise RuntimeError(
             _bilingual(
-                ".twbx 内未找到任何 .hyper 数据提取，无法读取数据表（.twb 工作簿本身不含数据；"
+                ".twbx 内未找到 .hyper / .mdb / .accdb 任何数据提取，无法读取数据表（.twb 工作簿本身不含数据；"
                 "若为旧版 .tde 提取暂不支持）",
-                "No .hyper extract found inside .twbx; cannot read a data table "
+                "No .hyper/.mdb/.accdb extract found inside .twbx; cannot read a data table "
                 "(the .twb workbook holds no data; legacy .tde is not yet supported)",
             )
         )
@@ -217,16 +220,36 @@ def _read_twbx(filepath: str, timestamp: str) -> StatFileResult:
             with z.open(h) as src, open(dest, "wb") as out:
                 out.write(src.read())
             results.append((h, _read_hyper(dest, timestamp)))
+        for i, m in enumerate(embedded_access, start=len(hyper_entries)):
+            dest = os.path.join(tmp, "embedded_%d%s" % (i, os.path.splitext(m)[1]))
+            with z.open(m) as src, open(dest, "wb") as out:
+                out.write(src.read())
+            try:
+                from . import reader_legacy
+                if m.lower().endswith(".accdb"):
+                    res_acc = reader_legacy._read_access(dest, timestamp)
+                else:
+                    res_acc = reader_legacy._read_access(dest, timestamp)
+                results.append((m, res_acc))
+            except Exception as e:
+                warnings_list.append(_bilingual(
+                    ".twbx 中内嵌 Access 文件 %s 读取失败: %s" % (m, e),
+                    "Failed to read embedded Access file %s inside .twbx: %s" % (m, e)))
+
+    if not results:
+        raise RuntimeError(_bilingual(
+            ".twbx 内所有数据提取均读取失败",
+            "All embedded extracts inside .twbx failed to read"))
 
     primary_name, primary = results[0]
     primary["metadata"]["file_format"] = "tableau_twbx"
     primary["metadata"]["source_container"] = "tableau_twbx"
-    primary["metadata"]["embedded_extracts"] = hyper_entries
+    primary["metadata"]["embedded_extracts"] = [n for n, _ in results]
     primary["warnings"].append(
         _bilingual(
-            "已从 .twbx 解包并读取内嵌 .hyper 数据提取: %s" % ", ".join(hyper_entries),
-            "Unpacked and read embedded .hyper extract(s) from .twbx: %s"
-            % ", ".join(hyper_entries),
+            "已从 .twbx 解包并读取内嵌数据提取: %s" % ", ".join(n for n, _ in results),
+            "Unpacked and read embedded extract(s) from .twbx: %s"
+            % ", ".join(n for n, _ in results),
         )
     )
     if len(results) > 1:
@@ -251,7 +274,7 @@ def _read_twbx(filepath: str, timestamp: str) -> StatFileResult:
 
 
 def _read_twb(filepath: str, timestamp: str) -> StatFileResult:
-    """A bare .twb workbook holds no embedded data — refuse with guidance."""
+    """A bare .twb workbook holds no embedded data -- refuse with guidance."""
     raise RuntimeError(
         _bilingual(
             ".twb 是 Tableau 工作簿（XML 定义），本身不含数据表，无法作为数据文件读取；"

@@ -1,5 +1,5 @@
 # === statdata-transfer dependencies ===
-# Statistical data format converter — 28+ formats
+# Statistical data format converter — 30+ formats
 # Usage: pip install -r requirements.txt
 
 # -------------------------
@@ -20,6 +20,9 @@ pyarrow>=17.0           # Parquet, Feather, Arrow, ORC (>=17.0 修复 CVE-2024-5
 lxml>=6.0               # XML, HTML, CDISC ODM (>=6.0 修复 CVE-2026-41066 XXE)
 odfpy>=1.4              # ODS (OpenDocument Spreadsheet)
 tableauhyperapi>=0.0.22502  # Tableau Hyper .hyper read/write (ships prebuilt native libhyper; Python >=3.6, verified on 3.13)
+dbfread>=2.0.7          # dBASE / FoxPro .dbf read (pure-Python; 2.0.7 uses DBF(load=True))
+dbf>=0.99.11            # dBASE / FoxPro .dbf write (pure-Python; set codepage='utf8' for CJK)
+pyodbc>=5.0             # MS Access .mdb/.accdb read (requires Microsoft Access Driver from host)
 
 # -------------------------
 # Optional (require external software or special setup)

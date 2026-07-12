@@ -12,6 +12,8 @@ import tempfile
 from datetime import datetime
 from typing import Any
 
+import h5py
+import numpy as np
 import pandas as pd
 
 from .reader_core import (ColumnInfo, MatlabMeta, Hdf5Meta, ParquetMeta, FeatherMeta, OrcMeta, StatFileResult, _bilingual, _calc_missing_pct, _get_source_type, _parse_value_labels, _build_column_report)
@@ -29,6 +31,8 @@ def _extract_full_meta(custom_meta: dict) -> dict:
     返回要 merge 到最终 metadata 的 dict。
     """
     full_meta_from_embed = {}
+    var_labels: dict = {}
+    val_labels: dict = {}
     if "stat-full-meta" in custom_meta:
         try:
             from .reader_core import restore_full_meta
@@ -36,8 +40,6 @@ def _extract_full_meta(custom_meta: dict) -> dict:
         except Exception:
             pass
     elif "stat-var-labels" in custom_meta:
-        var_labels = {}
-        val_labels = {}
         try:
             var_labels = json.loads(custom_meta["stat-var-labels"])
         except Exception:
@@ -48,20 +50,230 @@ def _extract_full_meta(custom_meta: dict) -> dict:
                 val_labels = _parse_value_labels(val_raw)
             except Exception:
                 pass
-        if var_labels:
-            full_meta_from_embed["variable_labels"] = var_labels
-        if val_labels:
-            full_meta_from_embed["value_labels"] = val_labels
+    if var_labels:
+        full_meta_from_embed["variable_labels"] = var_labels
+    if val_labels:
+        full_meta_from_embed["value_labels"] = val_labels
     return full_meta_from_embed
 
 
+# 常见「变量标签」属性名（HDF5 数据集/组上用于存储列说明的属性键）
+_LABEL_ATTR_KEYS = (
+    "variable_label", "label", "var_label", "LABEL",
+    "description", "DESCRIPTION", "column_label", "columnLabel",
+    "units", "UNITS",
+)
+
+
+def _build_df_from_datasets(datasets: dict, include_non_numeric: bool = True) -> tuple:
+    """从 {name: ndarray} 合并为单一 DataFrame。
+
+    - 1D 数组 → 一列
+    - 2D 数组 → 按列拆为多列（name_0, name_1, ...）
+    - >2D 数组 → 展平后 2D 保留（按列命名）
+    - 各行对齐到最大首维，首维为 1 的 1D 数组广播为全量
+    - 非数值 / 复杂类型默认跳过；include_non_numeric=True 时尝试 object 序列化
+    返回 (DataFrame, skipped_keys)。
+    """
+    skipped: list = []
+    max_len = 0
+    numeric = {}
+    for k, a in datasets.items():
+        if not hasattr(a, "shape"):
+            skipped.append(k); continue
+        arr = np.asarray(a)
+        if arr.dtype.kind not in "iufc" and arr.dtype.kind not in ("O", "S", "b"):
+            skipped.append(k); continue
+        numeric[k] = arr
+        ndim = arr.ndim
+        if ndim >= 1 and arr.shape[0] > max_len:
+            max_len = arr.shape[0]
+
+    if not numeric:
+        return pd.DataFrame(), skipped
+
+    out: dict = {}
+    for k, a in numeric.items():
+        if a.ndim == 0:
+            a = np.repeat(float(a), max_len)
+        if a.ndim == 1:
+            if len(a) == 1 and max_len > 1:
+                a = np.repeat(a, max_len)
+            out[k] = a.astype(object) if a.dtype.kind == "O" else a
+        elif a.ndim == 2:
+            for j in range(a.shape[1]):
+                out[f"{k}_{j}"] = a[:, j].astype(object) if a.dtype.kind == "O" else a[:, j]
+        else:
+            arr2 = a.reshape(a.shape[0], -1)
+            for j in range(arr2.shape[1]):
+                out[f"{k}_{j}"] = arr2[:, j]
+    return pd.DataFrame(out), skipped
+
+
+def _collect_attr_labels(f) -> dict:
+    """扫描 HDF5 文件顶层 dataset/group 的属性，按名称映射出变量标签。
+
+    仅当数据集/组的 base 名与 DataFrame 列名一致时才匹配（见 _read_hdf5 调用处）。
+    """
+    found: dict = {}
+
+    def _scan(name, obj):
+        if isinstance(obj, (h5py.Dataset, h5py.Group)):
+            base = name.rsplit("/", 1)[-1]
+            for ak in _LABEL_ATTR_KEYS:
+                if ak in obj.attrs:
+                    v = obj.attrs[ak]
+                    if isinstance(v, bytes):
+                        v = v.decode("utf-8", errors="replace")
+                    found[base] = str(v)
+                    break
+
+    f.visititems(_scan)
+    return found
+
+
+def _is_matlab_v73(filepath: str) -> bool:
+    """检测 MATLAB 7.3 (HDF5) 格式 —— scipy.loadmat 不支持，需要 h5py 回退。"""
+    try:
+        with open(filepath, "rb") as fh:
+            head = fh.read(128)
+        return b"MATLAB 7.3" in head
+    except Exception:
+        return False
+
+
+def _read_matlab_v73(filepath: str, timestamp: str, warnings_list: list) -> StatFileResult:
+    """MATLAB 7.3 (HDF5) 回退读取：提取顶层数值数据集为 DataFrame。
+
+    仅做 best-effort：struct/cell/对象等复杂类型暂跳过（保留在 matlab_metadata 中）。
+    """
+    import h5py
+    import numpy as np
+
+    arrays: dict = {}
+    skipped: list = []
+    mat_variables: dict = {}
+    with h5py.File(filepath, "r") as f:
+        for key in f.keys():
+            obj = f[key]
+            if isinstance(obj, h5py.Dataset):
+                arr = np.asarray(obj[()])
+                if arr.dtype.kind in "iufc":  # 数值 / 复数
+                    arrays[key] = arr
+                    mat_variables[key] = {"type": "ndarray", "shape": list(arr.shape), "dtype": str(arr.dtype)}
+                else:
+                    skipped.append(key)
+                    mat_variables[key] = {"type": "ndarray", "shape": list(arr.shape),
+                                          "dtype": str(arr.dtype), "note": "non-numeric skipped"}
+            elif isinstance(obj, h5py.Group):
+                skipped.append(key)
+                mat_variables[key] = {"type": "struct/cell", "note": "skipped (complex type)"}
+
+    if not arrays:
+        raise ValueError(_bilingual(
+            "MATLAB 7.3 (HDF5) 文件中未找到可转换为 DataFrame 的数值数据集",
+            "No numeric datasets convertible to DataFrame found in MATLAB 7.3 (HDF5) file"))
+
+    # 以最大首维为准对齐，1D 数组广播；2D 按列拆分成多列；>2D 压平为 2D
+    max_len = 0
+    for a in arrays.values():
+        if a.ndim >= 1:
+            max_len = max(max_len, a.shape[0])
+    out: dict = {}
+    for k, a in arrays.items():
+        if a.ndim == 1:
+            out[k] = a
+        elif a.ndim == 2:
+            for j in range(a.shape[1]):
+                out[f"{k}_{j}"] = a[:, j]
+        else:
+            out[k] = a.reshape(a.shape[0], -1)
+    for k in list(out.keys()):
+        if len(out[k]) == 1 and max_len > 1:
+            out[k] = np.repeat(out[k], max_len)
+
+    df = pd.DataFrame(out)
+    used_var = next(iter(arrays.keys()), None)
+    matlab_metadata: dict = {
+        "file_variables": mat_variables,
+        "mat_file_version": "7.3 (HDF5)",
+        "selected_variable": used_var,
+        "total_variables_in_file": len(mat_variables),
+        "skipped_variables": skipped,
+        "mat_file_header": "MATLAB 7.3 MAT-file (read via h5py fallback)",
+    }
+    if skipped:
+        warnings_list.append(_bilingual(
+            f"MATLAB 7.3 文件中 {len(skipped)} 个非数值/复杂变量已跳过（如 struct/cell），仅保留数值数据集",
+            f"{len(skipped)} non-numeric/complex variables skipped in MATLAB 7.3 file, only numeric datasets kept"))
+    return _finalize_matlab(df, used_var, matlab_metadata, warnings_list, timestamp)
+
+
+def _finalize_matlab(df, used_var, matlab_metadata, warnings_list, timestamp) -> StatFileResult:
+    column_report: dict = {}
+    for col in df.columns:
+        column_report[col] = ColumnInfo(
+            source_type=_get_source_type(df[col]),
+            pandas_dtype=str(df[col].dtype),
+            original_label=None,
+            has_value_labels=False,
+            n_missing=int(df[col].isnull().sum()),
+            missing_are_special=False,
+            precision_warning=False,
+            format_string=None,
+            display_width=None,
+            storage_width=None,
+            measure_level=None,
+            alignment=None,
+            original_type=None,
+        )
+        if pd.api.types.is_numeric_dtype(df[col]) or pd.api.types.is_float_dtype(df[col]):
+            max_val = df[col].abs().max()
+            if pd.notna(max_val) and max_val > 1e15:
+                column_report[col]["precision_warning"] = True
+                warnings_list.append(f"列 '{col}' 包含 >1e15 的数值，float64 精度可能不足 | Column '{col}' contains values >1e15, float64 precision may be insufficient")
+    return {
+        "dataframe": df,
+        "metadata": MatlabMeta(
+            file_format="matlab", collected_at=timestamp,
+            row_count=df.shape[0], column_count=df.shape[1],
+            total_missing_pct=_calc_missing_pct(df),
+            variable_labels={}, value_labels={}, special_missing={},
+            date_origin=None, file_encoding=None, file_label=None,
+            creation_time=None, modification_time=None, notes=[],
+            original_variable_types={}, readstat_variable_types={},
+            variable_value_labels={}, variable_to_label={},
+            missing_user_values={}, missing_ranges={},
+            variable_display_width={}, variable_storage_width={},
+            variable_measure={}, variable_alignment={},
+            column_names_to_labels={}, mr_sets={}, table_name=None,
+            matlab_metadata=matlab_metadata,
+        ),
+        "warnings": warnings_list,
+        "column_report": column_report,
+    }
+
+
 def _read_matlab(filepath: str, timestamp: str) -> StatFileResult:
-    """读入 MATLAB .mat 文件，使用 scipy.io.loadmat。"""
+    """读入 MATLAB .mat 文件，使用 scipy.io.loadmat（v7.3 自动回退 h5py）。"""
     import scipy.io
     import numpy as np
 
     warnings_list = [_bilingual("MATLAB 格式不含变量标签、值标签等统计元数据，仅保留原始数据值", "MATLAB format does not contain statistical metadata like variable/value labels, only raw data values")]
-    mat_data = scipy.io.loadmat(filepath, struct_as_record=False, squeeze_me=True)
+
+    # MATLAB 7.3 (HDF5) 不被 scipy 支持 → 直接走 h5py 回退
+    if _is_matlab_v73(filepath):
+        warnings_list.append(_bilingual("检测到 MATLAB 7.3 (HDF5) 文件，使用 h5py 回退读取", "Detected MATLAB 7.3 (HDF5) file, using h5py fallback"))
+        return _read_matlab_v73(filepath, timestamp, warnings_list)
+
+    try:
+        mat_data = scipy.io.loadmat(filepath, struct_as_record=False, squeeze_me=True)
+    except (NotImplementedError, OSError) as e:
+        msg = str(e)
+        if "7.3" in msg or "HDF5" in msg:
+            warnings_list.append(_bilingual(f"scipy 无法读取该 MAT 文件（{msg}），回退到 h5py", f"scipy cannot read this MAT file ({msg}), falling back to h5py"))
+            return _read_matlab_v73(filepath, timestamp, warnings_list)
+        raise
     matlab_metadata: dict[str, Any] = {
         "file_variables": {},
         "mat_file_version": None,
@@ -151,49 +363,8 @@ def _read_matlab(filepath: str, timestamp: str) -> StatFileResult:
     if len(struct_vars) > 1 or len(data_vars) - len(struct_vars) > 1:
         warnings_list.append(_bilingual(f"MAT 文件包含 {len(data_vars)} 个变量，已选择 '{used_var}' 构造 DataFrame，其余变量信息保留在 matlab_metadata.file_variables", f"MAT file contains {len(data_vars)} variables, selected '{used_var}' for DataFrame, remaining variable info saved in matlab_metadata.file_variables"))
 
-    column_report: dict[str, ColumnInfo] = {}
-    for col in df.columns:
-        column_report[col] = ColumnInfo(
-            source_type=_get_source_type(df[col]),
-            pandas_dtype=str(df[col].dtype),
-            original_label=None,
-            has_value_labels=False,
-            n_missing=int(df[col].isnull().sum()),
-            missing_are_special=False,
-            precision_warning=False,
-            format_string=None,
-            display_width=None,
-            storage_width=None,
-            measure_level=None,
-            alignment=None,
-            original_type=None,
-        )
-        if pd.api.types.is_numeric_dtype(df[col]) or pd.api.types.is_float_dtype(df[col]):
-            max_val = df[col].abs().max()
-            if pd.notna(max_val) and max_val > 1e15:
-                column_report[col]["precision_warning"] = True
-                warnings_list.append(f"列 '{col}' 包含 >1e15 的数值，float64 精度可能不足 | Column '{col}' contains values >1e15, float64 precision may be insufficient")
+    return _finalize_matlab(df, used_var, matlab_metadata, warnings_list, timestamp)
 
-    return {
-        "dataframe": df,
-        "metadata": MatlabMeta(
-            file_format="matlab", collected_at=timestamp,
-            row_count=df.shape[0], column_count=df.shape[1],
-            total_missing_pct=_calc_missing_pct(df),
-            variable_labels={}, value_labels={}, special_missing={},
-            date_origin=None, file_encoding=None, file_label=None,
-            creation_time=None, modification_time=None, notes=[],
-            original_variable_types={}, readstat_variable_types={},
-            variable_value_labels={}, variable_to_label={},
-            missing_user_values={}, missing_ranges={},
-            variable_display_width={}, variable_storage_width={},
-            variable_measure={}, variable_alignment={},
-            column_names_to_labels={}, mr_sets={}, table_name=None,
-            matlab_metadata=matlab_metadata,
-        ),
-        "warnings": warnings_list,
-        "column_report": column_report,
-    }
 
 
 
@@ -205,6 +376,7 @@ def _read_hdf5(filepath: str, timestamp: str) -> StatFileResult:
     import h5py
     
     warnings_list = []
+    attr_labels: dict = {}
     hdf5_metadata: dict[str, Any] = {
         "datasets": [],
         "file_attributes": {},
@@ -275,10 +447,20 @@ def _read_hdf5(filepath: str, timestamp: str) -> StatFileResult:
                         if ds_meta:
                             full_meta_from_embed = ds_meta
                             break
+            # 扫描顶层 dataset/group 的标签类属性，按列名还原变量标签
+            attr_labels = _collect_attr_labels(f)
         
         var_labels = full_meta_from_embed.get("variable_labels", {})
         val_labels = full_meta_from_embed.get("value_labels", {})
-        
+        # 用 HDF5 属性标签补充（仅当 embed 未提供该列标签）
+        for col in df.columns:
+            if col not in var_labels and col in attr_labels:
+                var_labels[col] = attr_labels[col]
+        if any(col in attr_labels for col in df.columns):
+            warnings_list.append(_bilingual(
+                "已从 HDF5 数据集/组属性中还原部分变量标签",
+                "Restored some variable labels from HDF5 dataset/group attributes"))
+
         column_report: dict[str, ColumnInfo] = {}
         for col in df.columns:
             column_report[col] = ColumnInfo(
@@ -338,57 +520,50 @@ def _read_hdf5(filepath: str, timestamp: str) -> StatFileResult:
         
         hdf5_metadata["total_datasets"] = len(hdf5_metadata["datasets"])
         hdf5_metadata["total_groups"] = len(hdf5_metadata["groups"])
-        
+
         if not hdf5_metadata["datasets"]:
             raise ValueError(_bilingual("HDF5 文件不包含任何 Dataset", "HDF5 file contains no Dataset"))
-        
-        best_ds: dict | None = None
-        best_size = -1
+
+        # 收集所有可转换的数据集，合并为单一 DataFrame（不再只取最大的那一个）
+        ds_map: dict = {}
         for ds_info in hdf5_metadata["datasets"]:
             shape = ds_info.get("shape", [])
             if len(shape) > 2:
                 continue
-            size = 1
-            for d in shape:
-                try:
-                    size *= int(d)
-                except (TypeError, ValueError):
-                    size = 0
-                    break
-            if size > best_size:
-                best_ds = ds_info
-                best_size = size
-        
-        if best_ds is None:
+            ds_map[ds_info["path"]] = None
+
+        if ds_map:
+            with h5py.File(filepath, "r") as f:
+                for path in list(ds_map.keys()):
+                    try:
+                        ds_map[path] = f[path][()]
+                    except Exception:
+                        pass
+
+        df, ds_skipped = _build_df_from_datasets(ds_map, include_non_numeric=True)
+
+        if df.empty:
             raise ValueError(_bilingual("HDF5 文件中没有可转换为 DataFrame 的 Dataset", "HDF5 file has no Dataset convertible to DataFrame"))
-        
-        ds_path = best_ds["path"]
-        hdf5_metadata["selected_dataset"] = ds_path
-        
+
+        hdf5_metadata["selected_dataset"] = "multi-merge (%d datasets)" % len([k for k, v in ds_map.items() if v is not None])
+
         with h5py.File(filepath, "r") as f:
-            ds = f[ds_path]
-            data = ds[:]
-            ds_shape = ds.shape
-            ds_dtype = ds.dtype
-            
             # 尝试读取嵌入的标签（先从根属性，再从 dataset 属性）
             full_meta_from_embed = _extract_from_attrs(f.attrs)
-            if not full_meta_from_embed:
-                full_meta_from_embed = _extract_from_attrs(ds.attrs)
-            
-            if len(ds_shape) == 1:
-                col_name = ds_path.rsplit("/", 1)[-1] if "/" in ds_path else ds_path
-                df = pd.DataFrame({col_name: data})
-            elif len(ds_shape) == 2:
-                if ds_dtype.names:
-                    df = pd.DataFrame(data)
-                    df.columns = list(ds_dtype.names)
-                else:
-                    df = pd.DataFrame(data)
+            # 扫描顶层 dataset/group 的标签类属性，按列名还原变量标签
+            attr_labels = _collect_attr_labels(f)
         
         var_labels = full_meta_from_embed.get("variable_labels", {})
         val_labels = full_meta_from_embed.get("value_labels", {})
-        
+        # 用 HDF5 属性标签补充（仅当 embed 未提供该列标签）
+        for col in df.columns:
+            if col not in var_labels and col in attr_labels:
+                var_labels[col] = attr_labels[col]
+        if any(col in attr_labels for col in df.columns):
+            warnings_list.append(_bilingual(
+                "已从 HDF5 数据集/组属性中还原部分变量标签",
+                "Restored some variable labels from HDF5 dataset/group attributes"))
+
         column_report: dict[str, ColumnInfo] = {}
         for col in df.columns:
             column_report[col] = ColumnInfo(
@@ -430,9 +605,13 @@ def _read_hdf5(filepath: str, timestamp: str) -> StatFileResult:
 
 
 def _read_parquet(filepath: str, timestamp: str) -> StatFileResult:
-    """读入 Parquet 文件，使用 pyarrow.parquet.read_table。"""
+    """读入 Parquet 文件，使用 pyarrow.parquet.read_table。目录则按分区数据集读取。"""
+    # 分区 Parquet 目录（含 part-*.parquet / Hive 分区子目录）
+    if os.path.isdir(filepath):
+        return _read_parquet_partitioned(filepath, timestamp)
+
     import pyarrow.parquet as pq
-    
+
     warnings_list = []
     parquet_metadata: dict[str, Any] = {}
 
@@ -497,7 +676,11 @@ def _read_parquet(filepath: str, timestamp: str) -> StatFileResult:
     if df.empty:
         warnings_list.append(_bilingual("Parquet 文件解析结果为空", "Parquet file parsed result is empty"))
 
-    column_report: dict[str, ColumnInfo] = {}
+    return _finalize_parquet(df, parquet_metadata, full_meta_from_embed, warnings_list, timestamp)
+
+
+def _finalize_parquet(df, parquet_metadata, full_meta_from_embed, warnings_list, timestamp) -> StatFileResult:
+    column_report: dict = {}
     var_labels = full_meta_from_embed.get("variable_labels", {})
     val_labels = full_meta_from_embed.get("value_labels", {})
     for col in df.columns:
@@ -544,6 +727,71 @@ def _read_parquet(filepath: str, timestamp: str) -> StatFileResult:
     # Merge all restored fields (包括 variable_labels, value_labels 等全部 17 个字段)
     result["metadata"].update({k: v for k, v in full_meta_from_embed.items() if v})
     return result
+
+
+def _read_parquet_partitioned(filepath: str, timestamp: str) -> StatFileResult:
+    """读入分区 Parquet 目录（Hive 风格 year=2020/part-*.parquet 或多 part 文件），合并为单一 DataFrame。"""
+    import pyarrow.dataset as ds
+    import pyarrow.parquet as pq
+
+    warnings_list = [_bilingual(
+        "Parquet 分区目录：已用 pyarrow.dataset 合并读取全部 part 文件",
+        "Parquet partitioned directory: merged all part files via pyarrow.dataset")]
+
+    try:
+        dataset = ds.dataset(filepath, format="parquet", partitioning="hive")
+    except Exception:
+        dataset = ds.dataset(filepath, format="parquet")
+
+    table = dataset.to_table()
+    df = table.to_pandas()
+
+    parquet_metadata: dict = {
+        "partitioned": True,
+        "num_files": len(dataset.files),
+        "files": dataset.files,
+        "num_rows": table.num_rows,
+        "num_columns": table.num_columns,
+        "partition_keys": dataset.partitioning.schema.names if dataset.partitioning is not None else [],
+    }
+    parquet_metadata["schema"] = str(table.schema)
+
+    # 自定义元数据（优先取首个文件，或从合并后 schema.metadata）
+    full_meta_from_embed = {}
+    custom_meta = {}
+    if hasattr(table.schema, "metadata") and table.schema.metadata:
+        for k, v in table.schema.metadata.items():
+            try:
+                key_str = k.decode("utf-8") if isinstance(k, bytes) else str(k)
+                val_str = v.decode("utf-8") if isinstance(v, bytes) else str(v)
+            except Exception:
+                continue
+            custom_meta[key_str] = val_str
+        if custom_meta:
+            parquet_metadata["custom_metadata"] = custom_meta
+            full_meta_from_embed = _extract_full_meta(custom_meta)
+    else:
+        # 退而从首个 part 文件读取 schema 级自定义元数据
+        try:
+            pf = pq.ParquetFile(dataset.files[0])
+            meta = pf.metadata
+            if hasattr(meta, "metadata") and meta.metadata:
+                cm = {}
+                for k, v in meta.metadata.items():
+                    try:
+                        cm[k.decode("utf-8") if isinstance(k, bytes) else str(k)] = v.decode("utf-8") if isinstance(v, bytes) else str(v)
+                    except Exception:
+                        continue
+                if cm:
+                    parquet_metadata["custom_metadata"] = cm
+                    full_meta_from_embed = _extract_full_meta(cm)
+        except Exception:
+            pass
+
+    if df.empty:
+        warnings_list.append(_bilingual("Parquet 分区目录解析结果为空", "Parquet partitioned directory parsed result is empty"))
+
+    return _finalize_parquet(df, parquet_metadata, full_meta_from_embed, warnings_list, timestamp)
 
 
 

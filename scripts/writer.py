@@ -611,6 +611,12 @@ def _write_hyper_dispatch(df, filepath, metadata=None, **kwargs):
     return reader_tableau._write_hyper(df, filepath, metadata, **kwargs)
 
 
+def _write_dbf_dispatch(df, filepath, metadata=None, **kwargs):
+    """Write .dbf via reader_legacy (lazy import: dbf only needed for .dbf)."""
+    from . import reader_legacy
+    return reader_legacy._write_dbf(df, filepath, metadata, **kwargs)
+
+
 # ============================================================
 # 统一写入入口
 # ============================================================
@@ -632,6 +638,7 @@ _SUPPORT_WRITERS = {
     ".hdf5": _write_hdf5,
     ".json": _write_json,
     ".hyper": _write_hyper_dispatch,
+    ".dbf": _write_dbf_dispatch,
 }
 
 

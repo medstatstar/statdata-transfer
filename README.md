@@ -4,14 +4,14 @@
 
 ---
 
-Read 28+ statistical software and clinical trial data formats (CDISC ODM/EpiData/EpiInfo/Excel/EViews/Feather/FST/GraphPad Prism/Gretl/HDF5/HTML/jamovi/JMP/JSON/MATLAB/Minitab/ODS/ORC/Parquet/R/SAS/SPSS/Stata/Weka ARFF/XML) into Python/pandas DataFrame, and **bidirectionally convert between any formats** (SPSS↔Stata↔R↔SAS↔Excel↔Parquet↔HDF5↔JSON…). For statistical binary formats (SPSS/Stata/SAS/R/Excel/Parquet/HDF5/…) it preserves full variable/value labels and missing-value metadata; text formats (CSV/XML/HTML/ODS) and JSON preserve only a retainable subset — see Format Limits.
+Read 50+ statistical software and clinical trial data formats (CDISC ODM/EpiData/EpiInfo/Excel/EViews/Feather/FST/GraphPad Prism/Gretl/HDF5/HTML/jamovi/JMP/JSON/MATLAB/Minitab/ODS/ORC/Parquet/R/SAS/SPSS/Stata/Weka ARFF/XML) into Python/pandas DataFrame, and **bidirectionally convert between any formats** (SPSS↔Stata↔R↔SAS↔Excel↔Parquet↔HDF5↔JSON…). For statistical binary formats (SPSS/Stata/SAS/R/Excel/Parquet/HDF5/…) it preserves full variable/value labels and missing-value metadata; text formats (CSV/XML/HTML/ODS) and JSON preserve only a retainable subset — see Format Limits.
 
 Note: This skill does not require any statistical software to be installed, but its functionality is limited to data format conversion only. If you need **an AI agent to seamlessly integrate with and invoke the analysis capabilities of various installed statistical software**, it is strongly recommended to use the **statsoft-cli** skill, which is specifically designed for AI agents to seamlessly integrate statistical software.
 
 ## Core Capabilities
 
 ### Read (Data Extraction)
-Extract data + all metadata (variable labels, value labels, special missing values, etc.) from 28+ statistical formats into pandas DataFrame as an intermediate format. Preserves metadata as completely as possible and clearly indicates what is preserved vs lost.
+Extract data + all metadata (variable labels, value labels, special missing values, etc.) from 50+ statistical formats into pandas DataFrame as an intermediate format. Preserves metadata as completely as possible and clearly indicates what is preserved vs lost.
 
 ### Write / Convert (Format Conversion)
 Convert read results to any other format:

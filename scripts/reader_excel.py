@@ -9,13 +9,41 @@ from typing import Any, Optional
 
 import pandas as pd
 
-from .reader_core import (ColumnInfo, ExcelMeta, StatFileResult, _calc_missing_pct, _get_source_type, DATE_ORIGINS)
+from .reader_core import (ColumnInfo, ExcelMeta, StatFileResult, _calc_missing_pct, _get_source_type, DATE_ORIGINS, _bilingual)
 
 # ============================================================
 # Excel 格式读入（.xlsx/.xls/.xlsm）
 # ============================================================
 
-def _read_excel(filepath, timestamp, *, format_type, encoding, sheet_name=None) -> StatFileResult:
+def _fill_merge_range(df: "pd.DataFrame", rlo: int, rhi: int, clo: int, chi: int) -> bool:
+    """用合并区域左上角值填充其余单元格。
+
+    行号/列号均为 1-based；1 = 表头行。表头合并（rlo<2）跳过，
+    由 pandas 默认保留首列，避免污染数据。返回是否发生了填充。
+    """
+    if rlo < 2:
+        return False
+    top_di = rlo - 2
+    top_ci = clo - 1
+    if not (0 <= top_di < len(df) and 0 <= top_ci < df.shape[1]):
+        return False
+    top_val = df.iat[top_di, top_ci]
+    changed = False
+    for r in range(rlo, rhi + 1):
+        for c in range(clo, chi + 1):
+            di = r - 2
+            ci = c - 1
+            if 0 <= di < len(df) and 0 <= ci < df.shape[1]:
+                try:
+                    if df.iat[di, ci] != top_val:
+                        df.iat[di, ci] = top_val
+                        changed = True
+                except Exception:
+                    pass
+    return changed
+
+
+def _read_excel(filepath, timestamp, *, format_type, encoding, sheet_name=None, fill_merged_cells: bool = True) -> StatFileResult:
     """读入 Excel 格式文件（.xlsx / .xls）"""
     warnings_list = []
     warnings_list.append(
@@ -94,28 +122,46 @@ def _read_excel(filepath, timestamp, *, format_type, encoding, sheet_name=None) 
             f"Excel: restored {len(var_labels)} variable labels and {len(val_labels)} value-label sets from helper sheets"
         )
     
-    # Extract merge cell ranges from the worksheet
+    # Extract merge cell ranges from the worksheet + 填充（fill_merged_cells=True）
     merge_cells = []
+    filled_any = False
     try:
         if format_type == "excel_xls":
-            # xlrd: sheet.merged_cells returns list of (row_low, row_high, col_low, col_high)
+            # xlrd: sheet.merged_cells returns list of (row_low, row_high, col_low, col_high) 0-based 半开区间
             import xlrd
             book = xlrd.open_workbook(filepath, on_demand=True)
             sheet = book.sheet_by_name(selected_sheet)
             for crange in sheet.merged_cells:
                 rlo, rhi, clo, chi = crange
-                merge_cells.append({"min_row": rlo+1, "max_row": rhi-1, "min_col": clo+1, "max_col": chi-1})
+                # 转换为 1-based 闭区间（修正原 rhi-1 偏移）
+                mc = {"min_row": rlo + 1, "max_row": rhi, "min_col": clo + 1, "max_col": chi}
+                merge_cells.append(mc)
+                if fill_merged_cells:
+                    filled_any |= _fill_merge_range(df, mc["min_row"], mc["max_row"], mc["min_col"], mc["max_col"])
             book.release_resources()
         else:
-            # openpyxl: ws.merged_cells.ranges returns list of CellRange objects
-            ws = xl.book[selected_sheet]
+            # openpyxl: 需用 load_workbook 获取可写 Worksheet，
+            # pd.ExcelFile 的 xl.book[...] 是 ReadOnlyWorksheet，无 merged_cells 属性
+            import openpyxl
+            wb = openpyxl.load_workbook(filepath, read_only=False, data_only=True)
+            ws = wb[selected_sheet]
             for crange in ws.merged_cells.ranges:
-                merge_cells.append({
+                mc = {
                     "min_row": crange.min_row, "max_row": crange.max_row,
                     "min_col": crange.min_col, "max_col": crange.max_col,
-                })
+                }
+                merge_cells.append(mc)
+                if fill_merged_cells:
+                    filled_any |= _fill_merge_range(df, mc["min_row"], mc["max_row"], mc["min_col"], mc["max_col"])
+            wb.close()
     except Exception:
         pass
+
+    if filled_any:
+        warnings_list.append(_bilingual(
+            "已用合并区域左上角值填充其余合并单元格（fill_merged_cells=True），避免其余单元格为 NaN",
+            "Filled merged-cell regions with their top-left value (fill_merged_cells=True) to avoid NaN in other cells"
+        ))
     
     excel_metadata = {
         "sheet_names": sheet_names,

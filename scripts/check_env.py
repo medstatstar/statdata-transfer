@@ -25,6 +25,9 @@ REQUIRED_PACKAGES = {
     "pzfx": "pzfx",
     # v1.9 新增
     "tableauhyperapi": "tableauhyperapi",  # Tableau Hyper .hyper (ships native libhyper binary)
+    "dbfread": "dbfread",                  # dBASE / FoxPro .dbf read
+    "dbf": "dbf",                          # dBASE / FoxPro .dbf write
+    "pyodbc": "pyodbc",                    # MS Access .mdb/.accdb read (needs host Access driver)
 }
 
 def check_and_install(auto_install: bool = False):

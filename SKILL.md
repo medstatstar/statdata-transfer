@@ -1,7 +1,7 @@
 ---
 name: statdata-transfer
 cn_name: 统计数据格式转换器 
-description: "读入 29+ 统计软件格式（含 Tableau Hyper .hyper / .twbx 打包工作簿）；对统计二进制格式（SPSS/Stata/SAS/R/Excel/Parquet/HDF5…）完整保留变量标签/值标签/缺失值等元数据，文本格式（CSV/XML/HTML/ODS）与 JSON 仅保留可保留的子集（详见格式限制）；支持任意格式双向互转。Read 29+ stats formats (incl. Tableau Hyper .hyper / .twbx packaged workbook); preserves full metadata for statistical binary formats and a subset for text/JSON formats (see format limits); bidirectionally convert between any formats (SPSS↔Stata↔R↔SAS↔Excel↔Parquet↔Tableau Hyper/.twbx…). See README.md / README_ZH.md for details."
+description: "读入 50+ 统计软件格式（含 Tableau Hyper .hyper/.twbx、dBASE .dbf、MS Access .mdb/.accdb、Mathematica .wdx、Origin .opju/.oggu、Excel 合并单元格填充、MATLAB v7.3+ 回退、Parquet 分区目录、HDF5 属性标签还原；SAS CPORT/Statistica/OxMetrics/SYSTAT/Paradox/LIMDEP/NCSS 为探测降级）；对统计二进制格式（SPSS/Stata/SAS/R/Excel/Parquet/HDF5…）完整保留变量标签/值标签/缺失值等元数据，文本格式（CSV/XML/HTML/ODS）与 JSON 仅保留可保留的子集（详见格式限制）；支持任意格式双向互转。Read 50+ stats formats (incl. Tableau Hyper .hyper/.twbx, dBASE .dbf, MS Access .mdb/.accdb, Mathematica .wdx, Origin .opju/.oggu, Excel merged-cell fill, MATLAB v7.3+ fallback, Parquet partitioned datasets, HDF5 attribute labels; SAS CPORT/Statistica/OxMetrics/SYSTAT/Paradox/LIMDEP/NCSS are detect-only fallbacks); preserves full metadata for statistical binary formats and a subset for text/JSON formats (see format limits); bidirectionally convert between any formats (SPSS↔Stata↔R↔SAS↔Excel↔Parquet↔Tableau Hyper/.twbx↔dBASE↔Access↔Mathematica↔Origin…). See README.md / README_ZH.md for details."
 triggers:
   - "statdata-transfer"
   - "统计数据格式转换"
@@ -14,7 +14,7 @@ metadata:
   {
     "openclaw": { "emoji": "🛠️", "icon": "assets/icon.svg"},
     "authors": ["medstatstar", "phoe-zip"],
-    "version": "1.9.0",
+    "version": "2.0.0",
     "license": "MIT",
     "tags": ["data-conversion", "statistics", "spss", "stata", "sas", "clinical-trials", "metadata", "pandas", "bidirectional"],
     "homepage": "https://github.com/medstatstar/statdata-transfer",
@@ -54,7 +54,7 @@ metadata:
 
 ## 触发条件 | Triggers
 
-- 读入 `.dta` `.sav` `.sas7bdat` `.rda` `.xlsx` `.mat` `.h5` `.parquet` `.json` `.xml` 等 28+ **统计软件数据格式** / Read statistical data files: `.dta` `.sav` `.sas7bdat` `.rda` `.xlsx` `.mat` `.h5` `.parquet` `.json` `.xml` + 20 more
+- 读入 `.dta` `.sav` `.sas7bdat` `.rda` `.xlsx` `.mat` `.h5` `.parquet` `.json` `.xml` `.dbf` `.mdb` `.accdb` `.hyper` `.twbx` 等 50+ **统计软件数据格式** / Read statistical data files: `.dta` `.sav` `.sas7bdat` `.rda` `.xlsx` `.mat` `.h5` `.parquet` `.json` `.xml` `.dbf` `.mdb` `.accdb` `.hyper` `.twbx` + 20 more
 - 将统计软件数据文件（`.sav` `.dta` `.sas7bdat` `.rda` `.xpt` 等）转换为另一统计格式并保留变量/值标签 / Convert a statistical-software data file to another stats format while preserving variable/value labels
 - 在 SPSS/Stata/SAS/R 之间迁移带元数据的数据集（非通用文件转换） / Migrate metadata-bearing datasets between SPSS/Stata/SAS/R (not generic file conversion)
 - 用户询问各统计格式读入能力边界 / User asks about statistical format capability limits
@@ -68,32 +68,46 @@ metadata:
 | Format | Extension | Dependency | Var Label | Val Label | Special Missing | Formula | Meta Preserve |
 |--------|-----------|------------|-----------|-----------|-----------------|---------|---------------|
 | CDISC ODM | `.odm` | lxml | ✗ | ✗ | ✗ | ✗ | ⚠️ Clinical data only |
+| dBASE / FoxPro | `.dbf` | dbfread / dbf | ✗ | ✗ | ✗ | ✗ | ⚠️ 字段名大写化（格式限制）；支持读+写 |
 | EpiData | `.rec` | R foreign | ✗ | ✗ | ✗ | ✗ | ⚠️ Via R |
 | EpiInfo | `.prj` `.xml` | xml/etree | ✅ | ✅(codes) | ✗ | ✗ | ✅ XML structure |
-| Excel | `.xlsx` `.xls` `.xlsm` | openpyxl / xlrd | ✗ | ✗ | ✗ | ⚠️ result only | ⚠️ Extra sheet for labels |
+| Excel | `.xlsx` `.xls` `.xlsm` | openpyxl / xlrd | ✗ | ✗ | ✗ | ⚠️ result only | ⚠️ Extra sheet for labels；合并单元格默认填充锚点值 |
 | EViews | `.wf1` `.wf2` | built-in | ✗ | ✗ | ✗ | ✗ | ⚠️ JSON structure |
 | Feather | `.feather` `.arrow` | pyarrow | ✅(schema) | ✅(schema) | ✗ | ✗ | ⚠️ Version diff |
 | FST | `.fst` | fst (R) | ✅(schema) | ✅(schema) | ✗ | ✗ | ⚠️ Version diff |
 | GraphPad Prism | `.pzfx` `.pz` | pzfx | ✗ | ✗ | ✗ | ✗ | ⚠️ Multi-table |
 | Gretl | `.gdt` `.gdtb` | built-in | ✅ | ✅(tables) | ✗ | ✗ | ✅ string-tables |
-| HDF5 | `.h5` `.hdf5` | h5py | ✗ | ✗ | ✗ | ✗ | ⚠️ Hierarchy, attrs on write |
+| HDF5 | `.h5` `.hdf5` | h5py | ✗ | ✗ | ✗ | ✗ | ⚠️ Hierarchy, attrs on write；属性标签还原 + 多数据集合并回退 |
 | Tableau Hyper | `.hyper` | tableauhyperapi | ✗ | ✗ | ✗ | ✗ | ⚠️ Column types (schema); statdata_meta side-table for labels |
 | Tableau 打包工作簿 | `.twbx` | (解包 + tableauhyperapi) | ✗ | ✗ | ✗ | ✗ | ⚠️ 解包提取内嵌 `.hyper` 读数据；仅 `.hyper` 提取含数据，`.tde` 旧格式暂不支持，`.twb` 工作簿 XML 本身不含数据 |
 | HTML | `.html` | lxml | ✗ | ✗ | ✗ | ✗ | ⚠️ Tables only |
 | jamovi | `.omv` | ZIP built-in | ✅ | ✅ | ✗ | ✗ | ✅ JSON analysis |
 | JMP | `.jmp` | jmpio-python | ⚠️ | ⚠️ | ✗ | ✗ | ⚠️ Multi-table |
 | JSON | `.json` | built-in | ✅ | ✅ | ✗ | ✗ | ✅ stat-full-meta on write |
-| MATLAB | `.mat` | scipy | ✗ | ✗ | ✗ | ✗ | ⚠️ Variable names |
+| MATLAB | `.mat` | scipy | ✗ | ✗ | ✗ | ✗ | ⚠️ Variable names；v7.3+ 回退 h5py |
+| Mathematica | `.wdx` | lxml | ✗ | ✗ | ✗ | ✗ | ⚠️ best-effort XML 解析 |
+| MS Access | `.mdb` `.accdb` | pyodbc + Microsoft Access Driver | ✗ | ✗ | ✗ | ✗ | ⚠️ 多表默认返回首个；需系统 Access 驱动 |
 | Minitab | `.mtw` `.mpj` | mtbpy / R | ✗ | ✗ | ✗ | ✗ | ⚠️ Via R |
 | ODS | `.ods` | odfpy | ✗ | ✗ | ✗ | ✗ | ⚠️ Data only |
 | ORC | `.orc` | pyarrow | ✅(schema) | ✅(schema) | ✗ | ✗ | ⚠️ Version diff |
-| Parquet | `.parquet` | pyarrow | ✅(schema) | ✅(schema) | ✗ | ✗ | ⚠️ Nested types, schema.metadata on write |
+| Origin | `.opju` `.oggu` | zipfile + lxml | ✗ | ✗ | ✗ | ✗ | ⚠️ best-effort；`.opju` zip+XML，`.oggu` 旧版需导出 |
+| Parquet | `.parquet` | pyarrow | ✅(schema) | ✅(schema) | ✗ | ✗ | ⚠️ Nested types, schema.metadata on write；分区目录支持 |
 | R | `.rda` `.rds` `.rdata` | pyreadr + R | ✅ | ✅ | ✅ | ✗ | ✅ statdata_meta, R bridge on write |
 | SAS | `.sas7bdat` `.xpt` `.sas7bcat` | pyreadstat | ✅ | ✅(need catalog) | ⚠️ | ✗ | ✅ |
 | SPSS | `.sav` `.zsav` `.por` | pyreadstat | ✅ | ✅ | ✅ | ✗ | ✅ |
 | Stata | `.dta` | pyreadstat | ✅ | ✅ | ⚠️ | ✗ | ✅ |
 | Weka ARFF | `.arff` | built-in | ✅ | ✅(nominal) | ✗ | ✗ | ✅ nominal mapping |
 | XML | `.xml` | lxml | ✗ | ✗ | ✗ | ✗ | ⚠️ Structure preserved |
+
+> 以下为 **探测降级格式**（无现成解析库，识别扩展名并给出清晰导出指引，不直接解析数据）| *Detect-only fallback formats (no parser available; recognized with clear export guidance)*
+
+| LIMDEP / NLOGIT | `.lpw` | — | ✗ | ✗ | ✗ | ✗ | ✗ 需原软件导出 CSV |
+| NCSS | `.ncss` | — | ✗ | ✗ | ✗ | ✗ | ✗ 需导出 CSV |
+| OxMetrics | `.in7` | — | ✗ | ✗ | ✗ | ✗ | ✗ 需导出 CSV/.dta |
+| Paradox | `.db` `.px` | — | ✗ | ✗ | ✗ | ✗ | ✗ 需导出 .dbf/CSV |
+| SAS CPORT | `.cpt` | — | ✗ | ✗ | ✗ | ✗ | ✗ 需 SAS 导出 XPORT(.xpt)/.sas7bdat |
+| Statistica | `.sta` | — | ✗ | ✗ | ✗ | ✗ | ✗ 需导出 .sav/.csv |
+| SYSTAT | `.sys` `.syd` | — | ✗ | ✗ | ✗ | ✗ | ✗ 需导出 CSV/.sav |
 
 > ✅=Full preservation · ⚠️=Partial/conditional · ✗=Not preserved
 
@@ -143,7 +157,7 @@ requires:
   bins: [python3]
   packages:
     core: [pyreadstat>=1.3.5, pyreadr, pandas]
-    extended: [openpyxl, xlrd, scipy, h5py, pyarrow, lxml, odfpy, tableauhyperapi]
+    extended: [openpyxl, xlrd, scipy, h5py, pyarrow, lxml, odfpy, tableauhyperapi, dbfread, dbf, pyodbc]
     optional: [jmpio-python, mtbpy, pzfx]
 ```
 

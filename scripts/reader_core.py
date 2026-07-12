@@ -689,20 +689,29 @@ def read_stat_file(
     encoding: str | None = None,
     sheet_name: str | None = None,
     object_name: str | None = None,
+    table_name: str | None = None,
 ) -> StatFileResult:
     """读入统计软件格式文件，最大限度保留元数据。
 
     对于多 Sheet Excel：可通过 sheet_name 指定工作表，不指定则默认选最大的
     对于多对象 RDA：可通过 object_name 指定对象，不指定则默认选最大的 DataFrame
+    对于多表 Access：可通过 table_name 指定表名，不指定则默认选首个
     """
     if not os.path.exists(filepath):
         raise FileNotFoundError(f"文件不存在: {filepath}")
+
+    timestamp = datetime.now().isoformat(timespec="seconds")
+
+    # 分区 Parquet 目录（含 part-*.parquet）：直接走专用读入，无需扩展名
+    if os.path.isdir(filepath):
+        from . import reader_science
+        return reader_science._read_parquet_partitioned(filepath, timestamp)
 
     # 延迟导入所有 handler（避免循环依赖）
     from . import (
         reader_spss, reader_sas, reader_stata, reader_r,
         reader_excel, reader_science, reader_modern, reader_odm,
-        reader_v14, reader_epinfo, reader_arff, reader_gretl, reader_tableau,
+        reader_v14, reader_epinfo, reader_arff, reader_gretl, reader_tableau, reader_legacy,
     )
 
     ext = os.path.splitext(filepath)[1].lower()
@@ -736,13 +745,27 @@ def read_stat_file(
         ".hyper": "tableau_hyper",  # Tableau Hyper extract
         ".twbx": "tableau_twbx",    # Tableau packaged workbook (zip; embeds .hyper)
         ".twb": "tableau_twb",      # Tableau workbook XML (no embedded data)
+        # v1.10 新增（Stat/Transfer 9 对照缺口）
+        ".dbf": "dbf_dbf",                    # dBASE / FoxPro
+        ".mdb": "access_mdb",                 # MS Access (pyodbc + 系统驱动)
+        ".accdb": "access_accdb",
+        ".wdx": "wdx_wdx",                    # Mathematica Wolfram Data Exchange
+        ".opju": "origin_opju",               # Origin project (zip+XML)
+        ".oggu": "origin_oggu",
+        ".cpt": "sas_cport",                  # SAS CPORT (占位: 需 SAS 导出)
+        ".sta": "statistica_sta",             # Statistica (占位: 需导出)
+        ".in7": "oxmetrics_in7",              # OxMetrics (占位: 需导出)
+        ".sys": "systat_sys",                 # SYSTAT (占位: 需导出)
+        ".syd": "systat_syd",
+        ".db": "paradox_db",                  # Paradox (占位: 需导出)
+        ".px": "paradox_px",
+        ".lpw": "limdep_lpw",                 # LIMDEP/NLOGIT (占位: 需导出)
+        ".ncss": "ncss_ncss",                 # NCSS (占位: 需导出)
     }
 
     file_format = format_map.get(ext)
     if file_format is None:
         raise ValueError(f"不支持的文件扩展名: {ext}")
-
-    timestamp = datetime.now().isoformat(timespec="seconds")
 
     handlers = {
         "stata": lambda: reader_stata._read_stata(filepath, timestamp,
@@ -806,6 +829,22 @@ def read_stat_file(
         "tableau_hyper": lambda: reader_tableau._read_hyper(filepath, timestamp),
         "tableau_twbx": lambda: reader_tableau._read_twbx(filepath, timestamp),
         "tableau_twb": lambda: reader_tableau._read_twb(filepath, timestamp),
+        # v1.10 新增
+        "dbf_dbf": lambda: reader_legacy._read_dbf(filepath, timestamp),
+        "access_mdb": lambda: reader_legacy._read_access(filepath, timestamp, table_name=table_name),
+        "access_accdb": lambda: reader_legacy._read_access(filepath, timestamp, table_name=table_name),
+        "wdx_wdx": lambda: reader_legacy._read_wdx(filepath, timestamp),
+        "origin_opju": lambda: reader_legacy._read_origin(filepath, timestamp),
+        "origin_oggu": lambda: reader_legacy._read_origin(filepath, timestamp),
+        "sas_cport": lambda: reader_legacy._read_cport(filepath, timestamp),
+        "statistica_sta": lambda: reader_legacy._read_statistica(filepath, timestamp),
+        "oxmetrics_in7": lambda: reader_legacy._read_oxmetrics(filepath, timestamp),
+        "systat_sys": lambda: reader_legacy._read_systat(filepath, timestamp),
+        "systat_syd": lambda: reader_legacy._read_systat(filepath, timestamp),
+        "paradox_db": lambda: reader_legacy._read_paradox(filepath, timestamp),
+        "paradox_px": lambda: reader_legacy._read_paradox(filepath, timestamp),
+        "limdep_lpw": lambda: reader_legacy._read_limdep(filepath, timestamp),
+        "ncss_ncss": lambda: reader_legacy._read_ncss(filepath, timestamp),
     }
 
     return handlers[file_format]()
