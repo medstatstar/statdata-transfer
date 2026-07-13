@@ -86,12 +86,12 @@ def _make_unsupported(software: str, suggestion_zh: str, suggestion_en: str):
         ext = os.path.splitext(filepath)[1].lower()
         raise RuntimeError(
             _bilingual(
-                f"暂不支持直接读取 {software} 专有格式 {ext}。\n"
-                f"请先用 {software} 将该数据导出为通用格式（{suggestion_zh}），"
-                f"再用本技能转换。",
                 f"Direct reading of {software} proprietary format {ext} is not yet supported.\n"
                 f"Please export the data from {software} to a common format ({suggestion_en}) first, "
                 f"then convert with this skill.",
+                f"暂不支持直接读取 {software} 专有格式 {ext}。\n"
+                f"请先用 {software} 将该数据导出为通用格式（{suggestion_zh}），"
+                f"再用本技能转换。",
             )
         )
 
@@ -114,9 +114,9 @@ def _read_dbf(filepath: str, timestamp: str) -> StatFileResult:
     except Exception as e:  # noqa: BLE001
         raise RuntimeError(
             _bilingual(
+                f"Failed to read dBASE (.dbf): {e}",
                 f"dBASE (.dbf) 文件读取失败: {e}\n"
                 f"请确认文件是有效的 dBASE/FoxPro 数据文件（非带备注的 .dbt 缺失或损坏）。",
-                f"Failed to read dBASE (.dbf): {e}",
             )
         )
 
@@ -193,8 +193,8 @@ def _write_dbf(df: pd.DataFrame, filepath: str, metadata: Optional[dict] = None,
     if variable_labels:
         warnings_list.append(
             _bilingual(
-                "dBASE 格式不含变量标签概念，标签信息已丢弃（仅数据列写出）。",
                 "dBASE has no variable-label concept; label metadata was dropped (data columns only).",
+                "dBASE 格式不含变量标签概念，标签信息已丢弃（仅数据列写出）。",
             )
         )
     # dBASE 字段名仅支持大写字母/数字/下划线，且最长 10 字符
@@ -202,9 +202,9 @@ def _write_dbf(df: pd.DataFrame, filepath: str, metadata: Optional[dict] = None,
     if lower_cols:
         warnings_list.append(
             _bilingual(
-                f"dBASE 字段名仅支持大写且最长 10 字符，以下列名已转换: {', '.join(lower_cols)}。",
                 f"dBASE field names are upper-cased and truncated to 10 chars; "
                 f"affected columns: {', '.join(lower_cols)}.",
+                f"dBASE 字段名仅支持大写且最长 10 字符，以下列名已转换: {', '.join(lower_cols)}。",
             )
         )
     return warnings_list
@@ -227,11 +227,11 @@ def _read_access(filepath: str, timestamp: str, *, table_name: str | None = None
     except pyodbc.Error as e:  # noqa: BLE001
         raise RuntimeError(
             _bilingual(
+                f"Cannot open Access database: {e}\n"
+                f"Confirm the file exists and the Microsoft Access Driver is installed.",
                 f"无法打开 Access 数据库: {e}\n"
                 f"请确认：①文件存在且未损坏；②系统已安装 Microsoft Access Driver "
                 f"(Microsoft Access Database Engine)。",
-                f"Cannot open Access database: {e}\n"
-                f"Confirm the file exists and the Microsoft Access Driver is installed.",
             )
         )
 
@@ -245,7 +245,7 @@ def _read_access(filepath: str, timestamp: str, *, table_name: str | None = None
         ]
         if not tables:
             raise RuntimeError(
-                _bilingual("Access 数据库未找到用户表。", "No user tables found in Access database.")
+                _bilingual("No user tables found in Access database.", "Access 数据库未找到用户表。")
             )
 
         # 选择目标表：用户指定 > 默认首表
@@ -253,8 +253,8 @@ def _read_access(filepath: str, timestamp: str, *, table_name: str | None = None
         if specified:
             if specified not in tables:
                 raise ValueError(_bilingual(
-                    f"表 '{specified}' 不在数据库表清单 ({', '.join(tables)})",
-                    f"Table '{specified}' not in database table list ({', '.join(tables)})"))
+                    f"Table '{specified}' not in database table list ({', '.join(tables)})",
+                    f"表 '{specified}' 不在数据库表清单 ({', '.join(tables)})"))
             target = specified
         else:
             target = tables[0]
@@ -264,10 +264,10 @@ def _read_access(filepath: str, timestamp: str, *, table_name: str | None = None
         if len(tables) > 1 and not specified:
             warnings_list.append(
                 _bilingual(
-                    f"Access 数据库检测到 {len(tables)} 个表，已返回第一个表 '{target}'。"
-                    f"其余表: {', '.join(tables[1:])}。如需指定表请用 table_name 参数。",
                     f"Access DB has {len(tables)} tables; returned the first ('{target}'). "
                     f"Others: {', '.join(tables[1:])}.",
+                    f"Access 数据库检测到 {len(tables)} 个表，已返回第一个表 '{target}'。"
+                    f"其余表: {', '.join(tables[1:])}。如需指定表请用 table_name 参数。",
                 )
             )
 
@@ -319,10 +319,10 @@ def _read_wdx(filepath: str, timestamp: str) -> StatFileResult:
     except Exception as e:  # noqa: BLE001
         raise RuntimeError(
             _bilingual(
+                f"Failed to parse .wdx: {e}",
                 f".wdx 文件解析失败: {e}\n"
                 f"若为 WXF 二进制格式，请用 Mathematica 'Export[\"file.wdx\", data, \"WXF\"]' "
                 f"导出为 XML 形式，或用 'Export[\"file.csv\", data]' 导出 CSV。",
-                f"Failed to parse .wdx: {e}",
             )
         )
 
@@ -331,16 +331,16 @@ def _read_wdx(filepath: str, timestamp: str) -> StatFileResult:
     if not variables:
         raise RuntimeError(
             _bilingual(
-                "未在 .wdx 中找到 <variable> 元素，无法识别为列数据。",
                 "No <variable> element found in .wdx; cannot interpret as tabular data.",
+                "未在 .wdx 中找到 <variable> 元素，无法识别为列数据。",
             )
         )
 
     warnings_list: list[str] = []
     warnings_list.append(
         _bilingual(
-            ".wdx 为 best-effort 解析（基于常见 WDX XML 结构）；若列未正确还原请改用 CSV 中转。",
             ".wdx parsed on a best-effort basis; if columns are wrong, use CSV as intermediary.",
+            ".wdx 为 best-effort 解析（基于常见 WDX XML 结构）；若列未正确还原请改用 CSV 中转。",
         )
     )
 
@@ -396,17 +396,17 @@ def _read_origin(filepath: str, timestamp: str) -> StatFileResult:
     if not zipfile.is_zipfile(filepath):
         raise RuntimeError(
             _bilingual(
+                f"Not a valid Origin package (expected zip): {os.path.basename(filepath)}",
                 f"文件不是有效的 Origin 包（期望 zip 结构）: {os.path.basename(filepath)}\n"
                 f"若为旧版 .oggu 二进制，请用 Origin 导出为 .opju 或 CSV。",
-                f"Not a valid Origin package (expected zip): {os.path.basename(filepath)}",
             )
         )
 
     warnings_list: list[str] = []
     warnings_list.append(
         _bilingual(
-            "Origin 读取为 best-effort（基于常见 worksheet XML 结构）；复杂工作簿建议用 Origin 导出 CSV。",
             "Origin read is best-effort; for complex workbooks export CSV from Origin.",
+            "Origin 读取为 best-effort（基于常见 worksheet XML 结构）；复杂工作簿建议用 Origin 导出 CSV。",
         )
     )
 
@@ -444,14 +444,14 @@ def _read_origin(filepath: str, timestamp: str) -> StatFileResult:
                         break  # 每个 worksheet 取第一个数据块
     except Exception as e:  # noqa: BLE001
         raise RuntimeError(
-            _bilingual(f"Origin 包解析失败: {e}", f"Origin package parse failed: {e}")
+            _bilingual(f"Origin package parse failed: {e}", f"Origin 包解析失败: {e}")
         )
 
     if not found:
         raise RuntimeError(
             _bilingual(
-                "未在 Origin 包中找到可解析的工作表数据块。",
                 "No parseable worksheet data block found in Origin package.",
+                "未在 Origin 包中找到可解析的工作表数据块。",
             )
         )
 
@@ -460,8 +460,8 @@ def _read_origin(filepath: str, timestamp: str) -> StatFileResult:
     if len(found) > 1:
         warnings_list.append(
             _bilingual(
-                f"Origin 包中找到 {len(found)} 个数据块，已返回最大的一个。",
                 f"Origin package had {len(found)} data blocks; returned the largest.",
+                f"Origin 包中找到 {len(found)} 个数据块，已返回最大的一个。",
             )
         )
 

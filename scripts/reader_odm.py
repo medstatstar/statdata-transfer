@@ -26,7 +26,7 @@ def _read_odm(filepath: str, timestamp: str) -> StatFileResult:
     import xml.etree.ElementTree as ET
 
     warnings_list = []
-    warnings_list.append(_bilingual("CDISC ODM 为临床试验数据交换格式，不含 SPSS/Stata 专有变量标签、值标签等统计元数据，仅保留原始数据值", "CDISC ODM is a clinical trial data exchange format, does not contain SPSS/Stata proprietary variable/value labels or other statistical metadata, only raw data values"))
+    warnings_list.append(_bilingual("CDISC ODM is a clinical trial data exchange format, does not contain SPSS/Stata proprietary variable/value labels or other statistical metadata, only raw data values", "CDISC ODM 为临床试验数据交换格式，不含 SPSS/Stata 专有变量标签、值标签等统计元数据，仅保留原始数据值"))
     odm_metadata: dict[str, Any] = {}
 
     tree = ET.parse(filepath)
@@ -127,7 +127,7 @@ def _read_odm(filepath: str, timestamp: str) -> StatFileResult:
             odm_metadata["clinical_data_rows"] = len(df)
             odm_metadata["clinical_data_columns"] = len(df.columns)
         else:
-            warnings_list.append(_bilingual("ClinicalData 部分均未找到可解析的 SubjectData 记录", "No parseable SubjectData records found in ClinicalData section"))
+            warnings_list.append(_bilingual("No parseable SubjectData records found in ClinicalData section", "ClinicalData 部分均未找到可解析的 SubjectData 记录"))
 
     # If no ClinicalData rows found, try extracting just metadata-def structured info
     if df.empty and md_version is not None:
@@ -150,12 +150,12 @@ def _read_odm(filepath: str, timestamp: str) -> StatFileResult:
         if all_items:
             df = pd.DataFrame(all_items)
             warnings_list.append(_bilingual(
-                "ODM 文件中无 ClinicalData 可转换为标准 DataFrame，已提取 MetaDataVersion 中的 ItemDef 元数据作为替代",
-                "ODM file has no ClinicalData for standard DataFrame conversion, extracted ItemDef metadata from MetaDataVersion as fallback"
+                "ODM file has no ClinicalData for standard DataFrame conversion, extracted ItemDef metadata from MetaDataVersion as fallback",
+                "ODM 文件中无 ClinicalData 可转换为标准 DataFrame，已提取 MetaDataVersion 中的 ItemDef 元数据作为替代"
             ))
 
     if df.empty:
-        raise ValueError(_bilingual("ODM 文件无法解析出任何数据（无 ClinicalData 且无 MetaDataVersion ItemDef）", "ODM file has no parseable data (no ClinicalData and no MetaDataVersion ItemDef)"))
+        raise ValueError(_bilingual("ODM file has no parseable data (no ClinicalData and no MetaDataVersion ItemDef)", "ODM 文件无法解析出任何数据（无 ClinicalData 且无 MetaDataVersion ItemDef）"))
 
     column_report: dict[str, ColumnInfo] = {}
     for col in df.columns:

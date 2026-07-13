@@ -1,6 +1,5 @@
-"""使用示例 | Usage Examples for statdata-transfer v1.7.0
-所有代码示例均可在 Python 3.10+ 环境中运行。
-All examples run in Python 3.10+.
+"""Usage Examples | 使用示例 for statdata-transfer v2.0.0
+All examples run in Python 3.10+ | 所有代码示例均可在 Python 3.10+ 环境中运行。
 """
 
 # ---------------------------------------------------------------------------

@@ -86,8 +86,8 @@ def _read_hyper(filepath: str, timestamp: str) -> StatFileResult:
 
         if not tables:
             raise RuntimeError(_bilingual(
-                f"Hyper 文件中未找到任何数据表: {filepath}",
                 f"No data table found in Hyper file: {filepath}",
+                f"Hyper 文件中未找到任何数据表: {filepath}",
             ))
 
         # prefer the Tableau extract convention "Extract"."Extract"
@@ -206,10 +206,10 @@ def _read_twbx(filepath: str, timestamp: str) -> StatFileResult:
     if not hyper_entries and not embedded_access:
         raise RuntimeError(
             _bilingual(
-                ".twbx 内未找到 .hyper / .mdb / .accdb 任何数据提取，无法读取数据表（.twb 工作簿本身不含数据；"
-                "若为旧版 .tde 提取暂不支持）",
                 "No .hyper/.mdb/.accdb extract found inside .twbx; cannot read a data table "
                 "(the .twb workbook holds no data; legacy .tde is not yet supported)",
+                ".twbx 内未找到 .hyper / .mdb / .accdb 任何数据提取，无法读取数据表（.twb 工作簿本身不含数据；"
+                "若为旧版 .tde 提取暂不支持）",
             )
         )
 
@@ -233,13 +233,13 @@ def _read_twbx(filepath: str, timestamp: str) -> StatFileResult:
                 results.append((m, res_acc))
             except Exception as e:
                 warnings_list.append(_bilingual(
-                    ".twbx 中内嵌 Access 文件 %s 读取失败: %s" % (m, e),
-                    "Failed to read embedded Access file %s inside .twbx: %s" % (m, e)))
+                    "Failed to read embedded Access file %s inside .twbx: %s" % (m, e),
+                    ".twbx 中内嵌 Access 文件 %s 读取失败: %s" % (m, e)))
 
     if not results:
         raise RuntimeError(_bilingual(
-            ".twbx 内所有数据提取均读取失败",
-            "All embedded extracts inside .twbx failed to read"))
+            "All embedded extracts inside .twbx failed to read",
+            ".twbx 内所有数据提取均读取失败"))
 
     primary_name, primary = results[0]
     primary["metadata"]["file_format"] = "tableau_twbx"
@@ -247,26 +247,26 @@ def _read_twbx(filepath: str, timestamp: str) -> StatFileResult:
     primary["metadata"]["embedded_extracts"] = [n for n, _ in results]
     primary["warnings"].append(
         _bilingual(
-            "已从 .twbx 解包并读取内嵌数据提取: %s" % ", ".join(n for n, _ in results),
             "Unpacked and read embedded extract(s) from .twbx: %s"
             % ", ".join(n for n, _ in results),
+            "已从 .twbx 解包并读取内嵌数据提取: %s" % ", ".join(n for n, _ in results),
         )
     )
     if len(results) > 1:
         primary["warnings"].append(
             _bilingual(
-                "检测到 %d 个内嵌数据提取，仅返回首个「%s」；其余未读取: %s"
-                % (len(results), primary_name, ", ".join(n for n, _ in results[1:])),
                 "Found %d embedded extracts; only the first «%s» is returned; others "
                 "not read: %s" % (len(results), primary_name, ", ".join(n for n, _ in results[1:])),
+                "检测到 %d 个内嵌数据提取，仅返回首个「%s」；其余未读取: %s"
+                % (len(results), primary_name, ", ".join(n for n, _ in results[1:])),
             )
         )
     if tde_entries:
         primary["warnings"].append(
             _bilingual(
-                "发现 %d 个旧版 .tde 提取未读取（暂不支持）: %s"
-                % (len(tde_entries), ", ".join(tde_entries)),
                 "Found %d legacy .tde extract(s) not read (unsupported yet): %s"
+                % (len(tde_entries), ", ".join(tde_entries)),
+                "发现 %d 个旧版 .tde 提取未读取（暂不支持）: %s"
                 % (len(tde_entries), ", ".join(tde_entries)),
             )
         )
@@ -277,10 +277,10 @@ def _read_twb(filepath: str, timestamp: str) -> StatFileResult:
     """A bare .twb workbook holds no embedded data -- refuse with guidance."""
     raise RuntimeError(
         _bilingual(
-            ".twb 是 Tableau 工作簿（XML 定义），本身不含数据表，无法作为数据文件读取；"
-            "请使用打包工作簿 .twbx（含内嵌 .hyper）或直接提供 .hyper 提取文件",
             ".twb is a Tableau workbook (XML definition) with no embedded data; cannot be "
             "read as a data file. Use a packaged .twbx (embeds .hyper) or a .hyper extract directly",
+            ".twb 是 Tableau 工作簿（XML 定义），本身不含数据表，无法作为数据文件读取；"
+            "请使用打包工作簿 .twbx（含内嵌 .hyper）或直接提供 .hyper 提取文件",
         )
     )
 
@@ -395,10 +395,10 @@ def _write_hyper(df: pd.DataFrame, filepath: str, metadata: dict | None = None, 
         if metadata.get("variable_labels") or metadata.get("value_labels"):
             warnings_list.append(
                 _bilingual(
-                    "变量/值标签通过 statdata_meta 副表存入 .hyper，仅本技能可读回；"
-                    "Tableau 等外部工具打开时仅见数据列",
                     "Variable/value labels stored in a statdata_meta side-table, "
                     "readable only by this skill; Tableau sees data columns only",
+                    "变量/值标签通过 statdata_meta 副表存入 .hyper，仅本技能可读回；"
+                    "Tableau 等外部工具打开时仅见数据列",
                 )
             )
     finally:

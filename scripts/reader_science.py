@@ -171,8 +171,8 @@ def _read_matlab_v73(filepath: str, timestamp: str, warnings_list: list) -> Stat
 
     if not arrays:
         raise ValueError(_bilingual(
-            "MATLAB 7.3 (HDF5) 文件中未找到可转换为 DataFrame 的数值数据集",
-            "No numeric datasets convertible to DataFrame found in MATLAB 7.3 (HDF5) file"))
+            "No numeric datasets convertible to DataFrame found in MATLAB 7.3 (HDF5) file",
+            "MATLAB 7.3 (HDF5) 文件中未找到可转换为 DataFrame 的数值数据集"))
 
     # 以最大首维为准对齐，1D 数组广播；2D 按列拆分成多列；>2D 压平为 2D
     max_len = 0
@@ -204,8 +204,8 @@ def _read_matlab_v73(filepath: str, timestamp: str, warnings_list: list) -> Stat
     }
     if skipped:
         warnings_list.append(_bilingual(
-            f"MATLAB 7.3 文件中 {len(skipped)} 个非数值/复杂变量已跳过（如 struct/cell），仅保留数值数据集",
-            f"{len(skipped)} non-numeric/complex variables skipped in MATLAB 7.3 file, only numeric datasets kept"))
+            f"{len(skipped)} non-numeric/complex variables skipped in MATLAB 7.3 file, only numeric datasets kept",
+            f"MATLAB 7.3 文件中 {len(skipped)} 个非数值/复杂变量已跳过（如 struct/cell），仅保留数值数据集"))
     return _finalize_matlab(df, used_var, matlab_metadata, warnings_list, timestamp)
 
 
@@ -259,11 +259,11 @@ def _read_matlab(filepath: str, timestamp: str) -> StatFileResult:
     import scipy.io
     import numpy as np
 
-    warnings_list = [_bilingual("MATLAB 格式不含变量标签、值标签等统计元数据，仅保留原始数据值", "MATLAB format does not contain statistical metadata like variable/value labels, only raw data values")]
+    warnings_list = [_bilingual("MATLAB format does not contain statistical metadata like variable/value labels, only raw data values", "MATLAB 格式不含变量标签、值标签等统计元数据，仅保留原始数据值")]
 
     # MATLAB 7.3 (HDF5) 不被 scipy 支持 → 直接走 h5py 回退
     if _is_matlab_v73(filepath):
-        warnings_list.append(_bilingual("检测到 MATLAB 7.3 (HDF5) 文件，使用 h5py 回退读取", "Detected MATLAB 7.3 (HDF5) file, using h5py fallback"))
+        warnings_list.append(_bilingual("Detected MATLAB 7.3 (HDF5) file, using h5py fallback", "检测到 MATLAB 7.3 (HDF5) 文件，使用 h5py 回退读取"))
         return _read_matlab_v73(filepath, timestamp, warnings_list)
 
     try:
@@ -271,7 +271,7 @@ def _read_matlab(filepath: str, timestamp: str) -> StatFileResult:
     except (NotImplementedError, OSError) as e:
         msg = str(e)
         if "7.3" in msg or "HDF5" in msg:
-            warnings_list.append(_bilingual(f"scipy 无法读取该 MAT 文件（{msg}），回退到 h5py", f"scipy cannot read this MAT file ({msg}), falling back to h5py"))
+            warnings_list.append(_bilingual(f"scipy cannot read this MAT file ({msg}), falling back to h5py", f"scipy 无法读取该 MAT 文件（{msg}），回退到 h5py"))
             return _read_matlab_v73(filepath, timestamp, warnings_list)
         raise
     matlab_metadata: dict[str, Any] = {
@@ -339,7 +339,7 @@ def _read_matlab(filepath: str, timestamp: str) -> StatFileResult:
                     df = pd.DataFrame(arrays)
                     used_var = list(numeric_vars.keys())[0]
             except Exception as e:
-                warnings_list.append(_bilingual(f"MAT 文件数值数组转换为 DataFrame 失败: {str(e)[:200]}", f"MAT file numeric array conversion to DataFrame failed: {str(e)[:200]}"))
+                warnings_list.append(_bilingual(f"MAT file numeric array conversion to DataFrame failed: {str(e)[:200]}", f"MAT 文件数值数组转换为 DataFrame 失败: {str(e)[:200]}"))
 
     if df.empty:
         # Fallback: grab first numeric array as single-column
@@ -349,19 +349,19 @@ def _read_matlab(filepath: str, timestamp: str) -> StatFileResult:
                     flat = value.flatten()
                     df = pd.DataFrame({key: flat})
                     used_var = key
-                    warnings_list.append(_bilingual(f"MAT 文件结构复杂，仅将变量 '{key}' 展平为单列 DataFrame", f"MAT file has complex structure, flattened variable '{key}' as single-column DataFrame"))
+                    warnings_list.append(_bilingual(f"MAT file has complex structure, flattened variable '{key}' as single-column DataFrame", f"MAT 文件结构复杂，仅将变量 '{key}' 展平为单列 DataFrame"))
                     break
                 except Exception:
                     continue
 
     if df.empty:
-        raise ValueError(_bilingual("MAT 文件无法转换为 DataFrame（可能只包含非数值数据/复杂结构）", "MAT file cannot be converted to DataFrame (may contain only non-numeric data/complex structures)"))
+        raise ValueError(_bilingual("MAT file cannot be converted to DataFrame (may contain only non-numeric data/complex structures)", "MAT 文件无法转换为 DataFrame（可能只包含非数值数据/复杂结构）"))
 
     matlab_metadata["selected_variable"] = used_var
     matlab_metadata["total_variables_in_file"] = len(data_vars)
 
     if len(struct_vars) > 1 or len(data_vars) - len(struct_vars) > 1:
-        warnings_list.append(_bilingual(f"MAT 文件包含 {len(data_vars)} 个变量，已选择 '{used_var}' 构造 DataFrame，其余变量信息保留在 matlab_metadata.file_variables", f"MAT file contains {len(data_vars)} variables, selected '{used_var}' for DataFrame, remaining variable info saved in matlab_metadata.file_variables"))
+        warnings_list.append(_bilingual(f"MAT file contains {len(data_vars)} variables, selected '{used_var}' for DataFrame, remaining variable info saved in matlab_metadata.file_variables", f"MAT 文件包含 {len(data_vars)} 个变量，已选择 '{used_var}' 构造 DataFrame，其余变量信息保留在 matlab_metadata.file_variables"))
 
     return _finalize_matlab(df, used_var, matlab_metadata, warnings_list, timestamp)
 
@@ -458,8 +458,8 @@ def _read_hdf5(filepath: str, timestamp: str) -> StatFileResult:
                 var_labels[col] = attr_labels[col]
         if any(col in attr_labels for col in df.columns):
             warnings_list.append(_bilingual(
-                "已从 HDF5 数据集/组属性中还原部分变量标签",
-                "Restored some variable labels from HDF5 dataset/group attributes"))
+                "Restored some variable labels from HDF5 dataset/group attributes",
+                "已从 HDF5 数据集/组属性中还原部分变量标签"))
 
         column_report: dict[str, ColumnInfo] = {}
         for col in df.columns:
@@ -500,7 +500,7 @@ def _read_hdf5(filepath: str, timestamp: str) -> StatFileResult:
         return result
     except Exception as e:
         # 降级到 h5py 遍历模式
-        warnings_list.append(_bilingual(f"pd.read_hdf 失败，回退到 h5py 模式: {e}", f"pd.read_hdf failed, falling back to h5py mode: {e}"))
+        warnings_list.append(_bilingual(f"pd.read_hdf failed, falling back to h5py mode: {e}", f"pd.read_hdf 失败，回退到 h5py 模式: {e}"))
     
         def _collect_datasets(name: str, obj):
             if isinstance(obj, h5py.Dataset):
@@ -522,7 +522,7 @@ def _read_hdf5(filepath: str, timestamp: str) -> StatFileResult:
         hdf5_metadata["total_groups"] = len(hdf5_metadata["groups"])
 
         if not hdf5_metadata["datasets"]:
-            raise ValueError(_bilingual("HDF5 文件不包含任何 Dataset", "HDF5 file contains no Dataset"))
+            raise ValueError(_bilingual("HDF5 file contains no Dataset", "HDF5 文件不包含任何 Dataset"))
 
         # 收集所有可转换的数据集，合并为单一 DataFrame（不再只取最大的那一个）
         ds_map: dict = {}
@@ -543,7 +543,7 @@ def _read_hdf5(filepath: str, timestamp: str) -> StatFileResult:
         df, ds_skipped = _build_df_from_datasets(ds_map, include_non_numeric=True)
 
         if df.empty:
-            raise ValueError(_bilingual("HDF5 文件中没有可转换为 DataFrame 的 Dataset", "HDF5 file has no Dataset convertible to DataFrame"))
+            raise ValueError(_bilingual("HDF5 file has no Dataset convertible to DataFrame", "HDF5 文件中没有可转换为 DataFrame 的 Dataset"))
 
         hdf5_metadata["selected_dataset"] = "multi-merge (%d datasets)" % len([k for k, v in ds_map.items() if v is not None])
 
@@ -561,8 +561,8 @@ def _read_hdf5(filepath: str, timestamp: str) -> StatFileResult:
                 var_labels[col] = attr_labels[col]
         if any(col in attr_labels for col in df.columns):
             warnings_list.append(_bilingual(
-                "已从 HDF5 数据集/组属性中还原部分变量标签",
-                "Restored some variable labels from HDF5 dataset/group attributes"))
+                "Restored some variable labels from HDF5 dataset/group attributes",
+                "已从 HDF5 数据集/组属性中还原部分变量标签"))
 
         column_report: dict[str, ColumnInfo] = {}
         for col in df.columns:
@@ -674,7 +674,7 @@ def _read_parquet(filepath: str, timestamp: str) -> StatFileResult:
             full_meta_from_embed = _extract_full_meta(custom_meta)
 
     if df.empty:
-        warnings_list.append(_bilingual("Parquet 文件解析结果为空", "Parquet file parsed result is empty"))
+        warnings_list.append(_bilingual("Parquet file parsed result is empty", "Parquet 文件解析结果为空"))
 
     return _finalize_parquet(df, parquet_metadata, full_meta_from_embed, warnings_list, timestamp)
 
@@ -735,8 +735,8 @@ def _read_parquet_partitioned(filepath: str, timestamp: str) -> StatFileResult:
     import pyarrow.parquet as pq
 
     warnings_list = [_bilingual(
-        "Parquet 分区目录：已用 pyarrow.dataset 合并读取全部 part 文件",
-        "Parquet partitioned directory: merged all part files via pyarrow.dataset")]
+        "Parquet partitioned directory: merged all part files via pyarrow.dataset",
+        "Parquet 分区目录：已用 pyarrow.dataset 合并读取全部 part 文件")]
 
     try:
         dataset = ds.dataset(filepath, format="parquet", partitioning="hive")
@@ -789,7 +789,7 @@ def _read_parquet_partitioned(filepath: str, timestamp: str) -> StatFileResult:
             pass
 
     if df.empty:
-        warnings_list.append(_bilingual("Parquet 分区目录解析结果为空", "Parquet partitioned directory parsed result is empty"))
+        warnings_list.append(_bilingual("Parquet partitioned directory parsed result is empty", "Parquet 分区目录解析结果为空"))
 
     return _finalize_parquet(df, parquet_metadata, full_meta_from_embed, warnings_list, timestamp)
 

@@ -27,7 +27,7 @@ def _read_sas_catalog(filepath: str, timestamp: str) -> StatFileResult:
     result = pyreadstat.read_sas7bcat(filepath)
     # result 是 dict: {format_name: {value: label}}
     warnings_list = []
-    warnings_list.append(_bilingual("SAS Catalog (.sas7bcat) 仅提供格式目录，仅读入 value_labels", "SAS Catalog (.sas7bcat) only provides format catalog, reads value_labels only"))
+    warnings_list.append(_bilingual("SAS Catalog (.sas7bcat) only provides format catalog, reads value_labels only", "SAS Catalog (.sas7bcat) 仅提供格式目录，仅读入 value_labels"))
     rows = []
     for fmt_name, val_dict in result.items():
         for val, lbl in val_dict.items():
@@ -36,7 +36,7 @@ def _read_sas_catalog(filepath: str, timestamp: str) -> StatFileResult:
         df = pd.DataFrame(rows)
     else:
         df = pd.DataFrame(columns=["format_name", "value", "label"])
-        warnings_list.append(_bilingual("SAS 目录文件为空，未找到任何格式定义", "SAS catalog file is empty, no format definitions found"))
+        warnings_list.append(_bilingual("SAS catalog file is empty, no format definitions found", "SAS 目录文件为空，未找到任何格式定义"))
 
     column_report: dict[str, ColumnInfo] = {}
     for col in df.columns:
@@ -124,7 +124,7 @@ def _read_jmp(filepath: str, timestamp: str) -> StatFileResult:
         tables = [jmp]
 
     if not tables:
-        raise ValueError(_bilingual("JMP 文件不包含任何数据表", "JMP file does not contain any data tables"))
+        raise ValueError(_bilingual("JMP file does not contain any data tables", "JMP 文件不包含任何数据表"))
 
     # 默认返回第一个表
     table = tables[0]
@@ -135,7 +135,7 @@ def _read_jmp(filepath: str, timestamp: str) -> StatFileResult:
     else:
         df = pd.DataFrame(table)
 
-    warnings_list.append(_bilingual(f"JMP 文件共 {len(tables)} 个数据表，当前仅返回第一个", f"JMP file has {len(tables)} data tables, only the first one returned"))
+    warnings_list.append(_bilingual(f"JMP file has {len(tables)} data tables, only the first one returned", f"JMP 文件共 {len(tables)} 个数据表，当前仅返回第一个"))
 
     all_meta = {
         "variable_labels": getattr(table, 'variable_labels', {}),
@@ -198,20 +198,20 @@ def _read_minitab(filepath, timestamp, *, format_type):
     import tempfile, subprocess, pandas as pd, os
 
     warnings_list = []
-    warnings_list.append(_bilingual("Minitab 格式不含变量标签、值标签等统计元数据，仅保留原始数据值", "Minitab format does not contain statistical metadata like variable/value labels, only raw data values"))
+    warnings_list.append(_bilingual("Minitab format does not contain statistical metadata like variable/value labels, only raw data values", "Minitab 格式不含变量标签、值标签等统计元数据，仅保留原始数据值"))
 
     # 1. 尝试 mtbpy（需要 Minitab 安装）
     try:
         import mtbpy
         # mtbpy 用法参考：mtbpy.read_mtw(filepath)
         df = mtbpy.read_mtw(filepath) if format_type == "minitab_mtw" else mtbpy.read_mpj(filepath)
-        warnings_list.append(_bilingual("通过 mtbpy 读入 Minitab 文件", "Read Minitab file via mtbpy"))
+        warnings_list.append(_bilingual("Read Minitab file via mtbpy", "通过 mtbpy 读入 Minitab 文件"))
         meta_extra = {"read_via": "mtbpy"}
     except ImportError:
         # 2. 尝试 R foreign::read.mtb() 中继
         rscript = _check_r_available()
         if rscript:
-            warnings_list.append(_bilingual("Minitab 软件未安装，通过 R foreign 包中继读入", "Minitab software not installed, reading via R foreign package bridge"))
+            warnings_list.append(_bilingual("Minitab software not installed, reading via R foreign package bridge", "Minitab 软件未安装，通过 R foreign 包中继读入"))
             return _read_minitab_via_r(filepath, timestamp, format_type, rscript)
         # 3. 都不可用：提示用户
         raise RuntimeError(
@@ -367,7 +367,7 @@ def _read_minitab_via_r(filepath, timestamp, format_type, rscript_path):
             table_name=None,
             minitab_metadata={"read_via": "R foreign::read.mtb()"},
         ),
-        "warnings": [_bilingual("通过 R foreign 包中继读入 Minitab 文件", "Read Minitab file via R foreign package bridge")],
+        "warnings": [_bilingual("Read Minitab file via R foreign package bridge", "通过 R foreign 包中继读入 Minitab 文件")],
         "column_report": column_report,
     }
 
@@ -389,19 +389,19 @@ def _read_prism(filepath, timestamp, *, format_type):
         )
 
     warnings_list = []
-    warnings_list.append(_bilingual("Prism 格式不含变量标签、值标签、测量级别等大部分统计元数据", "Prism format does not contain most statistical metadata like variable labels, value labels, measure levels, etc."))
+    warnings_list.append(_bilingual("Prism format does not contain most statistical metadata like variable labels, value labels, measure levels, etc.", "Prism 格式不含变量标签、值标签、测量级别等大部分统计元数据"))
     pz = pzfx.load_prism(filepath)
 
     # pzfx 返回的数据结构：pz.tables 是数据表列表
     tables = getattr(pz, "tables", [])
     if not tables:
-        raise ValueError(_bilingual("PRISM 文件不包含任何数据表", "PRISM file does not contain any data tables"))
+        raise ValueError(_bilingual("PRISM file does not contain any data tables", "PRISM 文件不包含任何数据表"))
 
     # 默认返回第一个数据表
     table = tables[0]
     df = table.to_dataframe() if hasattr(table, "to_dataframe") else pd.DataFrame(table)
     if len(tables) > 1:
-        warnings_list.append(_bilingual(f"PRISM 文件共 {len(tables)} 个数据表/结果表，当前仅返回第一个", f"PRISM file has {len(tables)} data/result tables, only the first one returned"))
+        warnings_list.append(_bilingual(f"PRISM file has {len(tables)} data/result tables, only the first one returned", f"PRISM 文件共 {len(tables)} 个数据表/结果表，当前仅返回第一个"))
 
     column_report = _build_column_report(
         df, {"variable_labels": {}}, {}, {}, {}, warnings_list, "prism"
@@ -455,13 +455,13 @@ def _read_jamovi(filepath, timestamp):
     import zipfile, pandas as pd, json, io
 
     warnings_list = []
-    warnings_list.append(_bilingual("jamovi 格式不含变量标签、值标签等大部分统计元数据", "jamovi format does not contain most statistical metadata like variable/value labels, etc."))
+    warnings_list.append(_bilingual("jamovi format does not contain most statistical metadata like variable/value labels, etc.", "jamovi 格式不含变量标签、值标签等大部分统计元数据"))
 
     with zipfile.ZipFile(filepath, "r") as zf:
         # 查找 CSV 数据文件
         csv_files = [f for f in zf.namelist() if f.endswith(".csv")]
         if not csv_files:
-            raise ValueError(_bilingual("jamovi 文件中未找到 CSV 数据文件", "No CSV data file found in jamovi file"))
+            raise ValueError(_bilingual("No CSV data file found in jamovi file", "jamovi 文件中未找到 CSV 数据文件"))
 
         # 读入第一个 CSV 文件
         with zf.open(csv_files[0]) as f:
@@ -471,7 +471,7 @@ def _read_jamovi(filepath, timestamp):
         # 且可能包含敏感信息，故不读取、不向外传播（避免意外收集/泄露嵌入内容）。
         analysis = {}
 
-    warnings_list.append(_bilingual(f"jamovi 文件包含 {len(csv_files)} 个 CSV 文件，当前仅读入 {csv_files[0]}", f"jamovi file contains {len(csv_files)} CSV files, currently only reading {csv_files[0]}"))
+    warnings_list.append(_bilingual(f"jamovi file contains {len(csv_files)} CSV files, currently only reading {csv_files[0]}", f"jamovi 文件包含 {len(csv_files)} 个 CSV 文件，当前仅读入 {csv_files[0]}"))
 
     column_report = _build_column_report(
         df, {"variable_labels": {}}, {}, {}, {}, warnings_list, "jamovi"
@@ -526,7 +526,7 @@ def _read_epidata(filepath, timestamp):
     import tempfile, subprocess, pandas as pd, os
 
     warnings_list = []
-    warnings_list.append(_bilingual("EpiData 格式不含变量标签、值标签等统计元数据，仅保留原始数据值", "EpiData format does not contain statistical metadata like variable/value labels, only raw data values"))
+    warnings_list.append(_bilingual("EpiData format does not contain statistical metadata like variable/value labels, only raw data values", "EpiData 格式不含变量标签、值标签等统计元数据，仅保留原始数据值"))
 
     rscript = _check_r_available()
     if rscript:
@@ -592,7 +592,7 @@ def _read_epidata_via_r(filepath, timestamp, rscript_path):
             table_name=None,
             epidata_metadata={"read_via": "R foreign::read.epiinfo()"},
         ),
-        "warnings": [_bilingual("通过 R foreign 包中继读入 EpiData .rec 文件", "Read EpiData .rec file via R foreign package bridge")],
+        "warnings": [_bilingual("Read EpiData .rec file via R foreign package bridge", "通过 R foreign 包中继读入 EpiData .rec 文件")],
         "column_report": column_report,
     }
 
@@ -605,7 +605,7 @@ def _read_eviews(filepath, timestamp, *, format_type):
     import pandas as pd, json
 
     warnings_list = []
-    warnings_list.append(_bilingual("EViews 格式不含变量标签、值标签等大部分统计元数据", "EViews format does not contain most statistical metadata like variable labels, value labels, etc."))
+    warnings_list.append(_bilingual("EViews format does not contain most statistical metadata like variable labels, value labels, etc.", "EViews 格式不含变量标签、值标签等大部分统计元数据"))
 
     if format_type == "eviews_wf2":
         with open(filepath, "r", encoding="utf-8") as f:
@@ -619,12 +619,12 @@ def _read_eviews(filepath, timestamp, *, format_type):
                     for sname, sdata in page["series"].items():
                         df[sname] = sdata.get("data", [])
         elif "workfile" in eviews_data:
-            warnings_list.append(_bilingual("EViews .wf2 格式：检测到 workfile 结构，尝试提取数据", "EViews .wf2 format: detected workfile structure, attempting to extract data"))
+            warnings_list.append(_bilingual("EViews .wf2 format: detected workfile structure, attempting to extract data", "EViews .wf2 格式：检测到 workfile 结构，尝试提取数据"))
         else:
-            warnings_list.append(_bilingual("EViews .wf2 格式：未识别的 JSON 结构，仅保存原始 JSON", "EViews .wf2 format: unrecognized JSON structure, saving raw JSON only"))
+            warnings_list.append(_bilingual("EViews .wf2 format: unrecognized JSON structure, saving raw JSON only", "EViews .wf2 格式：未识别的 JSON 结构，仅保存原始 JSON"))
 
         if df.empty:
-            warnings_list.append(_bilingual("无法从 EViews .wf2 提取 DataFrame，请将数据导出为 CSV 或 Excel", "Unable to extract DataFrame from EViews .wf2, please export data to CSV or Excel"))
+            warnings_list.append(_bilingual("Unable to extract DataFrame from EViews .wf2, please export data to CSV or Excel", "无法从 EViews .wf2 提取 DataFrame，请将数据导出为 CSV 或 Excel"))
             df = pd.DataFrame({"raw_json": [json.dumps(eviews_data, ensure_ascii=False)[:1000]]})
     else:
         # .wf1 是封闭二进制格式，需要 EViews 软件

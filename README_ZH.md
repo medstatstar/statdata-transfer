@@ -6,52 +6,71 @@
 
 读入 50+ 统计软件及临床试验数据格式（CDISC ODM/EpiData/EpiInfo/Excel/EViews/Feather/FST/GraphPad Prism/Gretl/HDF5/HTML/jamovi/JMP/JSON/MATLAB/Minitab/ODS/ORC/Parquet/R/SAS/SPSS/Stata/Weka ARFF/XML），转换为 Python/pandas DataFrame，并**支持任意格式双向互转**（SPSS↔Stata↔R↔SAS↔Excel↔Parquet↔HDF5↔JSON…）。对统计二进制格式（SPSS/Stata/SAS/R/Excel/Parquet/HDF5…）完整保留变量标签、值标签等元数据；文本格式（CSV/XML/HTML/ODS）与 JSON 仅保留可保留的子集——详见「格式限制」。
 
-注意：本技能不需要任何统计软件的支持，但功能仅限于数据格式转换。如果需要**AI智能体接入并无缝调用已安装的各种统计软件的分析功能，**，强烈建议使用技能 **statsoft-cli**。该技能专为AI智能体无缝集成统计软件设计。
+注意：本技能不需要任何统计软件的支持，但功能仅限于数据格式转换。如果需要**AI 智能体接入已安装的统计软件进行分析**，请使用 **[statsoft-cli](https://github.com/medstatstar/statsoft-cli)** 技能。
 
 ## 核心能力
 
 ### 读入（数据提取）
-从 50+ 统计软件格式中提取数据 + 元数据（变量标签、值标签、特殊缺失值…等全部元数据），转为 pandas DataFrame+作为中间格式，尽可能完整保留元数据，并明确标注保留/丢失情况。
+从 50+ 统计软件格式中提取数据 + 元数据，转为 pandas DataFrame，尽可能完整保留元数据，并明确标注保留/丢失情况。
 
 ### 转存（格式转换）
-将读入结果写出为任意其他格式：
 - **统计格式互转**：SPSS ↔ Stata ↔ R ↔ SAS XPT（保留全部元数据）
-- **导出通用格式**：Parquet、Feather、HDF5、JSON、CSV、TSV、Excel 等（元数据嵌入 schema.metadata 或 sidecar JSON）
-- **通用格式→统计格式**：反向保留元数据
+- **导出通用格式**：Parquet、Feather、HDF5、JSON、CSV、TSV、Excel（元数据嵌入 schema.metadata 或 sidecar JSON）
+- **通用格式→统计格式**：通过嵌入的 `stat-full-meta` 反向保留元数据
 
 ### 自动警告
 转换时检测并报告哪些元数据可以保留、哪些会丢失，避免静默的数据损失。所有警告信息均为中英双语。
 
+## 支持格式与能力矩阵
+
+*按字母排序。*
+
 | 格式 | 扩展名 | 依赖 | 变量标签 | 值标签 | 特殊缺失 | 公式 | 元数据保留 |
-|-------------|-----------------|:---:|:---:|:---:|:---:|:---:|:---:|
+|------|--------|------|---------|--------|---------|------|-----------|
 | CDISC ODM | `.odm` | lxml | ✗ | ✗ | ✗ | ✗ | ⚠️ 仅临床数据 |
-| EpiData | `.rec` | R | ✗ | ✗ | ✗ | ✗ | ⚠️ 通过R读入 |
-| EpiInfo | `.prj` `.xml` | xml/etree | ✅ | ✅(codes) | ✗ | ✗ | ✅ XML结构 |
-| Excel | `.xlsx` `.xls` `.xlsm` | openpyxl / xlrd | ✗ | ✗ | ✗ | ⚠️ 仅结果 | ⚠️ 写出用额外工作表 |
-| EViews | `.wf1` `.wf2` | 内置 | ✗ | ✗ | ✗ | ✗ | ⚠️ JSON结构 |
+| dBASE / FoxPro | `.dbf` | dbfread / dbf | ✗ | ✗ | ✗ | ✗ | ⚠️ 读+写；大写字段名 |
+| EpiData | `.rec` | R foreign | ✗ | ✗ | ✗ | ✗ | ⚠️ 通过 R 读入 |
+| EpiInfo | `.prj` `.xml` | xml/etree | ✅ | ✅(codes) | ✗ | ✗ | ✅ XML 结构 |
+| Excel | `.xlsx` `.xls` `.xlsm` | openpyxl / xlrd | ✗ | ✗ | ✗ | ⚠️ 仅结果 | ⚠️ 写出用额外工作表；合并单元格填充 |
+| EViews | `.wf1` `.wf2` | 内置 | ✗ | ✗ | ✗ | ✗ | ⚠️ JSON 结构 |
 | Feather | `.feather` `.arrow` | pyarrow | ✅(schema) | ✅(schema) | ✗ | ✗ | ⚠️ 版本差异 |
 | FST | `.fst` | fst (R) | ✅(schema) | ✅(schema) | ✗ | ✗ | ⚠️ 版本差异 |
 | GraphPad Prism | `.pzfx` `.pz` | pzfx | ✗ | ✗ | ✗ | ✗ | ⚠️ 多表 |
 | Gretl | `.gdt` `.gdtb` | 内置 | ✅ | ✅(tables) | ✗ | ✗ | ✅ string-tables |
-| HDF5 | `.h5` `.hdf5` | h5py | ✗ | ✗ | ✗ | ✗ | ⚠️ 层级结构，写出用文件属性 |
+| HDF5 | `.h5` `.hdf5` | h5py | ✗ | ✗ | ✗ | ✗ | ⚠️ 层级结构 + 属性标签 |
 | HTML | `.html` | lxml | ✗ | ✗ | ✗ | ✗ | ⚠️ 仅表格 |
-| jamovi | `.omv` | ZIP内置 | ✅ | ✅ | ✗ | ✗ | ✅ JSON分析 |
+| jamovi | `.omv` | ZIP 内置 | ✅ | ✅ | ✗ | ✗ | ✅ JSON 分析 |
 | JMP | `.jmp` | jmpio-python | ⚠️ | ⚠️ | ✗ | ✗ | ⚠️ 多表 |
-| JSON | `.json` | 内置 | ✅ | ✅ | ✗ | ✗ | ✅ 写出嵌入stat-full-meta |
-| MATLAB | `.mat` | scipy | ✗ | ✗ | ✗ | ✗ | ⚠️ 变量名 |
-| Minitab | `.mtw` `.mpj` | mtbpy / R | ✗ | ✗ | ✗ | ✗ | ⚠️ 通过R读入 |
+| JSON | `.json` | 内置 | ✅ | ✅ | ✗ | ✗ | ✅ 写出嵌入 stat-full-meta |
+| MATLAB | `.mat` | scipy | ✗ | ✗ | ✗ | ✗ | ⚠️ v7.3+ 走 h5py 回退 |
+| Mathematica | `.wdx` | lxml | ✗ | ✗ | ✗ | ✗ | ⚠️ Best-effort XML |
+| Minitab | `.mtw` `.mpj` | mtbpy / R | ✗ | ✗ | ✗ | ✗ | ⚠️ 通过 R 读入 |
+| MS Access | `.mdb` `.accdb` | pyodbc + Access 驱动 | ✗ | ✗ | ✗ | ✗ | ⚠️ 多表；需系统驱动 |
 | ODS | `.ods` | odfpy | ✗ | ✗ | ✗ | ✗ | ⚠️ 仅数据 |
 | ORC | `.orc` | pyarrow | ✅(schema) | ✅(schema) | ✗ | ✗ | ⚠️ 版本差异 |
-| Parquet | `.parquet` | pyarrow | ✅(schema) | ✅(schema) | ✗ | ✗ | ⚠️ 嵌套类型，写出用schema.metadata |
-| R | `.rda` `.rds` | pyreadr + R | ✅ | ✅ | ✅ | ✗ | ✅ statdata_meta，写出通过R桥接 |
-| SAS | `.sas7bdat` `.xpt` `.sas7bcat` | pyreadstat | ✅ | ✅(需catalog) | ⚠️ | ✗ | ✅ |
+| Origin | `.opju` `.oggu` | zipfile + lxml | ✗ | ✗ | ✗ | ✗ | ⚠️ Best-effort |
+| Parquet | `.parquet` | pyarrow | ✅(schema) | ✅(schema) | ✗ | ✗ | ⚠️ 嵌套类型；分区数据集 |
+| R | `.rda` `.rds` `.rdata` | pyreadr + R | ✅ | ✅ | ✅ | ✗ | ✅ statdata_meta + R 桥接 |
+| SAS | `.sas7bdat` `.xpt` `.sas7bcat` | pyreadstat | ✅ | ✅(需 catalog) | ⚠️ | ✗ | ✅ |
 | SPSS | `.sav` `.zsav` `.por` | pyreadstat | ✅ | ✅ | ✅ | ✗ | ✅ |
 | Stata | `.dta` | pyreadstat | ✅ | ✅ | ⚠️ | ✗ | ✅ |
 | Weka ARFF | `.arff` | 内置 | ✅ | ✅(nominal) | ✗ | ✗ | ✅ 名义映射 |
 | XML | `.xml` | lxml | ✗ | ✗ | ✗ | ✗ | ⚠️ 结构保留 |
 
 > ✅=完整保留 · ⚠️=部分保留或条件性 · ✗=无法保留
-*按字母排序*
+
+### 探测降级格式
+无现成解析库，识别扩展名并给出清晰导出指引（不解析数据）。
+
+| 格式 | 扩展名 | 导出指引 |
+|------|--------|---------|
+| LIMDEP / NLOGIT | `.lpw` | 从原软件导出 CSV |
+| NCSS | `.ncss` | 导出 CSV |
+| OxMetrics | `.in7` | 导出 CSV / `.dta` |
+| Paradox | `.db` `.px` | 导出 `.dbf` / CSV |
+| SAS CPORT | `.cpt` | SAS: `proc export` 为 XPORT(`.xpt`) / `.sas7bdat` |
+| Statistica | `.sta` | 导出 `.sav` / `.csv` |
+| SYSTAT | `.sys` `.syd` | 导出 CSV / `.sav` |
 
 ## 返回结构
 
@@ -66,9 +85,34 @@
         # ... 全部元数据
     },
     "warnings": [],
+    "column_report": {"q1": {"source_type": "int", "pandas_dtype": "int64"}},
 }
 ```
 
+## 元数据保留层级
+
+### 读入降损规则
+1. **统计二进制格式**（SPSS/Stata/SAS/R）：100% 元数据完整保留
+2. **Arrow 生态**（Parquet/Feather/ORC/FST）：仅还原 `write_stat_file` 写入的标签
+3. **非统计格式**（CSV/Excel/XML/HTML/ODS）：仅保留数据值；可使用 `apply_value_labels()` 手动附加
+4. **R 格式**：v1.6.0+ 通过 `statdata_meta` 属性嵌入全部元数据
+
+### 元数据丢失警告
+运行时 `warnings` 列表包含：
+- 特殊缺失值变为 NaN
+- 测量级别/显示宽度/对齐方式丢失
+- 多重响应集（MR Sets）无法保留
+- 文件标签/注释不保留
+- 日期基准不保存
+
+## 提供输入文件 | Providing Input File
+
+AI 智能体（如 WorkBuddy）只能直接上传有限类型的文件。当数据文件无法直接上传时，有两种方式：
+
+1. **在提示词中使用文件绝对路径**（如 `convert C:/Users/Name/Desktop/data.sav to .dta`）
+2. **将文件压缩为 `.zip` 包**后上传
+
+技能会自动解压并处理包含单个数据文件的 zip 归档。
 
 ## 推荐读入策略
 
@@ -84,37 +128,30 @@
 
 | 格式 | 内存行为 |
 |------|---------|
-| pyreadstat (SPSS/Stata/SAS) | 全文件加载到 RAM；受可用内存限制 |
+| pyreadstat (SPSS/Stata/SAS) | 全文件加载到 RAM |
 | HDF5 | 支持分块读取；不受 RAM 限制 |
-| Parquet | pyarrow 支持 mmap 映射模式；可处理 >内存的文件 |
+| Parquet | pyarrow 支持 mmap 映射；可处理 >内存的文件 |
 
 ## 编码注意事项
 
 - **中文文件**：旧版 Stata/SAS 可能使用 GBK/gb2312。使用 `encoding='gbk'`。
 - **欧洲文件**：部分 SAS 文件使用 Latin-1。UTF-8 失败时尝试 `encoding='latin1'`。
-- **Excel**：通常自动检测。
-
-## 推荐做法
-
-1. **读入前**：使用 `check_env.py` 确认环境就绪。
-2. **读入时**：UTF-8 失败时尝试 `encoding='gbk'`（中文）或 `encoding='latin1'`（欧洲）。
-3. **读入后**：检查 `result['warnings']` 和列报告中的精度风险/特殊缺失列。
-4. **旧版 RData**：v1.2+ 自动回退到 R 处理，无需手动转换。
-
-## 安装依赖
-
-```bash
-pip install -r requirements.txt
-```
+- **自动检测**：SPSS/Stata/SAS 默认启用 `_auto_detect_encoding`。
 
 ## 快速开始
 
-完整代码示例见 `references/usage_examples.py`。或在 WorkBuddy 对话中直接调用：
+```bash
+# 检查环境
+python scripts/check_env.py --install
+```
 
+完整代码示例：[`references/usage_examples.py`](./references/usage_examples.py)
+
+WorkBuddy 对话示例：
 ```
 > convert data.sav to .dta
-> read data.sav and show metadata
-> are there any metadata loss concerns converting .sav to .xlsx?
+> 读入 data.sav 并显示元数据
+> .sav 转 .xlsx 会丢失元数据吗？
 ```
 
 ## 扩展
@@ -123,95 +160,91 @@ pip install -r requirements.txt
 
 ## 格式限制与解决方案
 
-*已解决项标 ✅ / 新增能力标 🔄；未标项为固有格式限制（按字母排序，能力矩阵见 SKILL.md）。*
+*已解决项标 ✅ / 新增能力标 🔄；未标项为固有格式限制（按字母排序，能力矩阵见上）。*
 
 ### CDISC ODM (.odm)
-**读入限制：**
-- ❌ XML 结构依赖，嵌套解析取决于 ODM 文件结构规范性。复杂的 AttributeValue 结构可能解析不完整。
-- ❌ ODM 规范本身不含统计元数据（变量标签、值标签），仅保留临床数据结构。
+**读入：**
+- ❌ XML 结构依赖，嵌套解析取决于 ODM 文件结构规范性
+- ❌ ODM 规范本身不含统计元数据，仅保留临床数据结构
+
+### dBASE / FoxPro (.dbf)
+**读入：**
+- ❌ 字段名强制大写（格式限制）
+- ✅ 支持读+写
 
 ### EpiData (.rec)
-**读入限制：**
-- ❌ 唯一读入路径为 R + `foreign` 包。无 Python 原生备选方案。
-- ❌ 统计元数据（变量标签、值标签）在 R → CSV 桥接过程中丢失。
+**读入：**
+- ❌ 唯一读入路径为 R + `foreign` 包
+- ❌ 统计元数据在 R → CSV 桥接过程中丢失
 
 ### EpiInfo (.prj)
-**读入限制：**
-- ❌ 项目文件不含数据，需关联外部 CSV。
-- 自动搜索同名 CSV 或交叉验证目录内 CSV。
-- ❌ Access 不支持，需先导出 CSV。
+**读入：**
+- ❌ 项目文件不含数据；自动搜索同名 CSV
+- ❌ Access 不支持，需先导出 CSV
+**写出：**
+- ✅ 变量标签和 codes 在 XML 结构中重建
 
-### Excel (.xlsx/.xls)
-**读入限制：**
-- ✅ **合并单元格**：默认用锚点（左上角）值填充合并区域内其他单元格，避免出现 NaN。通过 `fill_merged_cells=True`（默认）启用；可传 `False` 关闭。合并区域坐标仍记录在 `excel_metadata.merge_cell_ranges`。
-- ❌ 公式丢失，仅保留计算结果。
-- ❌ 图表/形状不提取。
+### Excel (.xlsx/.xls/.xlsm)
+**读入：**
+- ✅ **合并单元格**：用锚点值填充合并区域；通过 `fill_merged_cells=True`（默认）启用，可传 `False` 关闭
+- ❌ 公式丢失，仅保留计算结果
+- ❌ 图表/形状不提取
+**写出：**
+- 变量/值标签存储在独立元数据工作表中
 
-**转存说明：**
-- 变量/值标签存储在独立元数据工作表中。
-
-### HDF5 (.h5)
-**读入限制：**
-- ✅ **多层级数据集**：当 `pd.read_hdf` 无法解析时，自动回退到 h5py 合并模式，收集**全部**顶层数值数据集合并为单一 DataFrame（1D → 1 列，2D → 按列拆分，>2D → 展平到 2D，按首维对齐、单元素广播）。
-- ✅ **属性标签还原**：扫描顶层 Dataset / Group 上的常用属性键（`label`、`description`、`units`、`ColumnLabel` 等），按名称映射为变量标签（`stat-full-meta` 嵌入元数据优先，属性作补充）。
-- 层级结构仍展平为顶级变量（HDF5 无原生「表」概念，仅 best-effort）。
-
-**转存说明：**
-- 写入时使用文件级属性存储元数据（via h5py）。
+### HDF5 (.h5/.hdf5)
+**读入：**
+- ✅ **多层级数据集**：`pd.read_hdf` 失败时自动回退到 h5py，合并全部顶层数值数据集
+- ✅ **属性标签还原**：扫描常用属性键（`label`、`description`、`units`、`ColumnLabel`…）
+- ❌ 层级结构仍展平为顶级变量
+**写出：**
+- 写入时使用文件级属性存储元数据
 
 ### JMP (.jmp)
-**读入限制：**
-- ❌ 依赖 jmpio-python，版本支持不一。
-- ❌ 多表 JMP 文件仅返回第一个数据表（额外表的元数据保存在 jmp_metadata 中）。
-
-**转存说明：**
-- 仅支持单表写出，多表结构可能丢失表级元数据。
+**读入：**
+- ❌ 依赖 jmpio-python，版本支持不一
+- ❌ 多表 JMP 文件仅返回第一个数据表
+**写出：**
+- 仅支持单表写出
 
 ### MATLAB (.mat)
-**读入限制：**
-- ✅ **v7.3+（HDF5 格式）**：检测 `MATLAB 7.3` 文件头或 scipy 失败时，自动走 h5py 路径；按 1D/2D/>2D 合并数值数据集为 DataFrame，非数值/ struct / cell 变量列在 `matlab_metadata.skipped_variables` 中并仅保留数值数据。
-- ❌ 复杂结构（嵌套 cell、稀疏矩阵、函数句柄）仍回退为单列扁平化输出。
-- ❌ Object 类和 datetime 列仍丢失类型保真度。
+**读入：**
+- ✅ **v7.3+（HDF5 格式）**：检测 `MATLAB 7.3` 文件头或 scipy 失败 → h5py 路径
+- ❌ 复杂结构（嵌套 cell、稀疏矩阵、函数句柄）→ 单列扁平化输出
+- ❌ Object 类和 datetime 列丢失类型保真度
 
 ### Parquet (.parquet)
-**读入限制：**
-- ❌ 深层嵌套类型（>2 层 list<struct>）通过 pyarrow.to_pandas() 转换后变为不透明的 Python 对象列。Arrow schema 保真度保留，但 pandas 表示可能丢失结构。
-- ✅ **分区数据集**：传入目录（含 `part-*.parquet` 或 Hive 分区子目录）时，通过 `pyarrow.dataset` 合并读取全部 part 文件为单一 DataFrame（含 `partition_keys`）。`read_stat_file()` 也接受目录路径。
+**读入：**
+- ❌ 深层嵌套类型（>2 层 list<struct>）→ 不透明的 Python 对象列
+- ✅ **分区数据集**：含 `part-*.parquet` 或 Hive 分区子目录 → `pyarrow.dataset` 合并读取
 
-### R (.rda/.rds)
-**读入限制：**
-- ✅ 旧版 ASCII XDR (RDA2)：pyreadstat 无法读取，**已自动回退到 R**（推荐安装 R）。无 R 时该格式失败。
-- ❌ factor 顺序可能未保留为 Categorical 顺序，除非通过 stat-full-meta 嵌入。
-- 多对象 RDA 文件：`read_all_r_objects()` 返回全部对象列表。
+### R (.rda/.rds/.rdata)
+**读入：**
+- ✅ 旧版 ASCII XDR (RDA2)：**自动回退到 R**（推荐安装 R）
+- ❌ factor 顺序可能未保留为 Categorical 顺序
+- ❌ 多对象 RDA 文件：`read_all_r_objects()` 返回全部对象列表
+**写出：**
+- 通过 R 桥接（statdata_meta 属性）实现完整元数据往返
 
-**转存说明：**
-- 写回操作通过 R 桥接（statdata_meta 属性）实现完整元数据往返。
-
-### SAS (.sas7bdat)
-**读入限制：**
-- 值标签定义在 `.sas7bcat`，需与数据文件同目录自动加载。
-- ❌ Viya CAS 新格式不支持。
-- 日期基准：1960-01-01。
+### SAS (.sas7bdat/.xpt/.sas7bcat)
+**读入：**
+- ✅ 值标签定义在 `.sas7bcat`，需与数据文件同目录自动加载
+- ❌ Viya CAS `.sashdat` 不支持
+- 日期基准：1960-01-01
 
 ### SPSS (.sav/.zsav/.por)
-**读入限制：**
-- ❌ MR Sets 读入为原始字典，语义需手动重建。
-- ❌ 公式丢失，仅保留计算结果。
-- ❌ 特殊缺失值标记需保留。
-- `.zsav` 读入需 gzip 解压，pyreadstat 1.2+ 直接支持，否则自动降级为解压后读入。
-- ❌ `.por` 为 SPSS 旧版导出格式，变量类型映射可能简化。
-
-**转存说明：**
-- `.zsav` 写出需 pyreadstat 1.2+ 支持，否则自动降级为 `.sav` 写出。
+**读入：**
+- ❌ MR Sets 读入为原始字典，语义需手动重建
+- ❌ 公式丢失，仅保留计算结果
+- ⚠️ 特殊缺失值（`.A`–`.Z`）在 `special_missing` 中标记；写出时需显式保留
+**写出：**
+- `.zsav` 写出需 pyreadstat 1.2+ 支持，否则自动降级为 `.sav`
 
 ### Stata (.dta)
-**读入限制：**
-- 特殊缺失值（.a–.z）：当 user_missing=True（默认）时保留为 DataFrame 中的字符标签；当 user_missing=False 时不可逆地变为 NaN。
-- ✅ 旧版 (pre-v13) Latin-1 编码已**自动检测**（`_auto_detect_encoding`），无需手动指定。
-- ❌ Stata 117-119（最新格式）：pyreadstat 1.3.5 不支持，写回时自动降级为 version 15。
-
-**转存说明：**
-- user_missing=True 时特殊缺失标签通过 missing_user_values 参数正确写回。
+**读入：**
+- ⚠️ 特殊缺失值（`.a`–`.z`）：`user_missing=True`（默认）时保留为字符标签；`user_missing=False` 时不可逆地变为 NaN
+- ✅ 旧版 (pre-v13) Latin-1 编码已自动检测
+- ❌ Stata 117-119：pyreadstat 1.3.5 不支持，写回时自动降级为 version 15
 
 ## 许可证
 

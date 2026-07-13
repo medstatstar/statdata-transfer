@@ -159,8 +159,8 @@ def _read_excel(filepath, timestamp, *, format_type, encoding, sheet_name=None, 
 
     if filled_any:
         warnings_list.append(_bilingual(
-            "已用合并区域左上角值填充其余合并单元格（fill_merged_cells=True），避免其余单元格为 NaN",
-            "Filled merged-cell regions with their top-left value (fill_merged_cells=True) to avoid NaN in other cells"
+            "Filled merged-cell regions with their top-left value (fill_merged_cells=True) to avoid NaN in other cells",
+            "已用合并区域左上角值填充其余合并单元格（fill_merged_cells=True），避免其余单元格为 NaN"
         ))
     
     excel_metadata = {

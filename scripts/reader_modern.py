@@ -18,7 +18,7 @@ from .reader_core import (ColumnInfo, JsonMeta, XmlMeta, OdsMeta, HtmlMeta, Stat
 def _read_json(filepath: str, timestamp: str) -> StatFileResult:
     """读入 JSON 文件，支持 meta+data 包裹结构以保留标签"""
     warnings_list = []
-    warnings_list.append(_bilingual("JSON 格式仅在使用 {\"meta\":{}, \"data\":[]} 包裹结构时可保留 variable_labels 和 value_labels，不含其他统计元数据", "JSON format only supports variable_labels and value_labels in {meta:{...}, data:[...]} wrapper structure, no other statistical metadata"))
+    warnings_list.append(_bilingual("JSON format only supports variable_labels and value_labels in {meta:{...}, data:[...]} wrapper structure, no other statistical metadata", "JSON 格式仅在使用 {\"meta\":{}, \"data\":[]} 包裹结构时可保留 variable_labels 和 value_labels，不含其他统计元数据"))
     json_metadata: dict[str, Any] = {}
     
     with open(filepath, 'r', encoding='utf-8') as f:
@@ -48,7 +48,7 @@ def _read_json(filepath: str, timestamp: str) -> StatFileResult:
     json_metadata["has_meta"] = bool(var_labels or val_labels)
     
     if df.empty:
-        warnings_list.append(_bilingual("JSON 文件解析结果为空", "JSON file parsed result is empty"))
+        warnings_list.append(_bilingual("JSON file parsed result is empty", "JSON 文件解析结果为空"))
 
     column_report: dict[str, ColumnInfo] = {}
     for col in df.columns:
@@ -98,7 +98,7 @@ def _read_json(filepath: str, timestamp: str) -> StatFileResult:
 def _read_xml(filepath: str, timestamp: str) -> StatFileResult:
     """读入 XML 文件，使用 pd.read_xml。"""
     warnings_list = []
-    warnings_list.append(_bilingual("XML 格式不含变量标签、值标签等统计元数据，仅保留原始数据值", "XML format does not contain statistical metadata like variable/value labels, only raw data values"))
+    warnings_list.append(_bilingual("XML format does not contain statistical metadata like variable/value labels, only raw data values", "XML 格式不含变量标签、值标签等统计元数据，仅保留原始数据值"))
     xml_metadata: dict[str, Any] = {}
 
     df = pd.read_xml(filepath)
@@ -155,12 +155,12 @@ def _read_xml(filepath: str, timestamp: str) -> StatFileResult:
 def _read_ods(filepath: str, timestamp: str) -> StatFileResult:
     """读入 ODS 文件，使用 pd.read_excel(engine='odf')。"""
     warnings_list = []
-    warnings_list.append(_bilingual("ODS 格式不含变量标签、值标签等统计元数据，仅保留原始数据值", "ODS format does not contain statistical metadata like variable/value labels, only raw data values"))
+    warnings_list.append(_bilingual("ODS format does not contain statistical metadata like variable/value labels, only raw data values", "ODS 格式不含变量标签、值标签等统计元数据，仅保留原始数据值"))
 
     xl = pd.ExcelFile(filepath, engine="odf")
     sheet_names = xl.sheet_names
     if len(sheet_names) == 0:
-        raise ValueError(_bilingual("ODS 文件不包含任何工作表", "ODS file does not contain any worksheet"))
+        raise ValueError(_bilingual("ODS file does not contain any worksheet", "ODS 文件不包含任何工作表"))
 
     # Select the largest sheet
     selected_sheet = None
@@ -186,7 +186,7 @@ def _read_ods(filepath: str, timestamp: str) -> StatFileResult:
 
     if len(sheet_names) > 1:
         warnings_list.append(
-            _bilingual(f"ODS 文件包含 {len(sheet_names)} 个工作表，已选择 '{selected_sheet}'", f"ODS file contains {len(sheet_names)} sheets, selected '{selected_sheet}'")
+            _bilingual(f"ODS file contains {len(sheet_names)} sheets, selected '{selected_sheet}'", f"ODS 文件包含 {len(sheet_names)} 个工作表，已选择 '{selected_sheet}'")
         )
 
     column_report: dict[str, ColumnInfo] = {}
@@ -237,12 +237,12 @@ def _read_ods(filepath: str, timestamp: str) -> StatFileResult:
 def _read_html(filepath: str, timestamp: str) -> StatFileResult:
     """读入 HTML 文件，使用 pd.read_html（可能返回多个表），返回第一个表。"""
     warnings_list = []
-    warnings_list.append(_bilingual("HTML 格式不含变量标签、值标签等统计元数据，仅保留原始数据值", "HTML format does not contain statistical metadata like variable/value labels, only raw data values"))
+    warnings_list.append(_bilingual("HTML format does not contain statistical metadata like variable/value labels, only raw data values", "HTML 格式不含变量标签、值标签等统计元数据，仅保留原始数据值"))
 
     # Read all tables from HTML
     tables = pd.read_html(filepath)
     if not tables:
-        raise ValueError(_bilingual("HTML 文件未找到任何 <table> 元素", "HTML file contains no <table> elements"))
+        raise ValueError(_bilingual("HTML file contains no <table> elements", "HTML 文件未找到任何 <table> 元素"))
 
     html_metadata: dict[str, Any] = {
         "total_tables": len(tables),
@@ -343,7 +343,7 @@ def _read_csv(filepath: str, timestamp: str, encoding: str = None) -> StatFileRe
     csv_metadata["separator_guess"] = ","
     
     if df.empty:
-        warnings_list.append(_bilingual("CSV 文件解析结果为空", "CSV file parsed result is empty"))
+        warnings_list.append(_bilingual("CSV file parsed result is empty", "CSV 文件解析结果为空"))
 
     column_report: dict[str, ColumnInfo] = {}
     for col in df.columns:

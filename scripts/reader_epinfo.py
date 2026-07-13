@@ -213,7 +213,7 @@ def _read_epinfo(prj_path: str, timestamp: str, encoding: str | None = None,
                     field_names.append(field["name"])
     
     if not all_fields:
-        warnings_list.append(_bilingual("EpiInfo 项目文件不包含任何字段定义，请检查文件格式", "EpiInfo project file contains no field definitions, please check file format"))
+        warnings_list.append(_bilingual("EpiInfo project file contains no field definitions, please check file format", "EpiInfo 项目文件不包含任何字段定义，请检查文件格式"))
     
     # Find data file
     actual_data_file = data_file
@@ -223,8 +223,8 @@ def _read_epinfo(prj_path: str, timestamp: str, encoding: str | None = None,
     
     if actual_data_file is None:
         warnings_list.append(_bilingual(
-            "未找到 EpiInfo 关联的数据文件。请指定 data_file 参数，或确保项目目录下有与项目同名的 .csv 文件。",
-            "No associated data file found for EpiInfo. Please specify data_file parameter, or ensure a CSV file with the same name as the project exists in the project directory."
+            "No associated data file found for EpiInfo. Please specify data_file parameter, or ensure a CSV file with the same name as the project exists in the project directory.",
+            "未找到 EpiInfo 关联的数据文件。请指定 data_file 参数，或确保项目目录下有与项目同名的 .csv 文件。"
         ))
     
     # Read data
@@ -236,9 +236,9 @@ def _read_epinfo(prj_path: str, timestamp: str, encoding: str | None = None,
                 df = pd.read_csv(actual_data_file, **read_kwargs)
             else:
                 # Access - use R bridge or pyodbc
-                warnings_list.append(_bilingual("Access 数据库读入暂不支持，请使用 CSV 导出格式", "Access database import is not supported, please use CSV export format"))
+                warnings_list.append(_bilingual("Access database import is not supported, please use CSV export format", "Access 数据库读入暂不支持，请使用 CSV 导出格式"))
         except Exception as e:
-            warnings_list.append(_bilingual(f"读入数据文件失败: {e}", f"Failed to read data file: {e}"))
+            warnings_list.append(_bilingual(f"Failed to read data file: {e}", f"读入数据文件失败: {e}"))
     
     # Build metadata
     variable_labels = {}

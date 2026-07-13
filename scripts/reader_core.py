@@ -258,9 +258,9 @@ def _calc_missing_pct(df: pd.DataFrame) -> float:
     return round(missing / total * 100, 2)
 
 
-def _bilingual(zh: str, en: str) -> str:
-    """Create bilingual string (zh | en)."""
-    return f"{zh} | {en}"
+def _bilingual(en: str, zh: str) -> str:
+    """Create bilingual string (en | zh). English first, Chinese second."""
+    return f"{en} | {zh}"
 
 
 def _parse_value_labels(val_raw: dict) -> dict:

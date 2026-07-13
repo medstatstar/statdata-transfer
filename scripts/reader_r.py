@@ -238,7 +238,7 @@ def _read_r_via_rscript(filepath: str, format_type: str, object_name: str | None
 
     rscript_path = _check_r_available()
     if not rscript_path:
-        raise RuntimeError(_bilingual("R 环境未安装。请安装 R: https://cran.r-project.org/", "R environment not installed. Please install R: https://cran.r-project.org/"))
+        raise RuntimeError(_bilingual("R environment not installed. Please install R: https://cran.r-project.org/", "R 环境未安装。请安装 R: https://cran.r-project.org/"))
 
     filepath_r = filepath.replace("\\", "/")
 
@@ -261,10 +261,10 @@ def _read_r_via_rscript(filepath: str, format_type: str, object_name: str | None
         )
 
         if result.returncode != 0:
-            raise RuntimeError(_bilingual(f"R 执行失败:\n{result.stderr[:1000]}", f"R execution failed:\n{result.stderr[:1000]}"))
+            raise RuntimeError(_bilingual(f"R execution failed:\n{result.stderr[:1000]}", f"R 执行失败:\n{result.stderr[:1000]}"))
 
         if not os.path.exists(tmp_csv):
-            raise ValueError(_bilingual("R 未生成预期的输出文件", "R did not generate the expected output file"))
+            raise ValueError(_bilingual("R did not generate the expected output file", "R 未生成预期的输出文件"))
 
         df = pd.read_csv(tmp_csv, index_col=0, encoding='utf-8')
         df.index = df.index.rename(None)
@@ -319,7 +319,7 @@ def _read_r_via_rscript(filepath: str, format_type: str, object_name: str | None
             except Exception:
                 pass
 
-    warnings_list.append(_bilingual(f"通过 R （{os.path.basename(rscript_path)}）间接读入（CSV bridging）。原始格式: {format_type}", f"Indirect read via R ({os.path.basename(rscript_path)}) (CSV bridging). Original format: {format_type}"))
+    warnings_list.append(_bilingual(f"Indirect read via R ({os.path.basename(rscript_path)}) (CSV bridging). Original format: {format_type}", f"通过 R （{os.path.basename(rscript_path)}）间接读入（CSV bridging）。原始格式: {format_type}"))
 
     # 尝试从嵌入元数据还原
     var_labels = {}
@@ -349,13 +349,13 @@ def _read_r_via_rscript(filepath: str, format_type: str, object_name: str | None
         missing_ranges = embedded_meta.get('missing_ranges', {})
         missing_user = embedded_meta.get('missing_user_values', {})
         col_to_label = embedded_meta.get('column_names_to_labels', {})
-        warnings_list.append(_bilingual("R 回退路径：从 stat-full-meta / statdata_meta 属性还原全部 17 字段元数据", "R fallback path: restored all 17 metadata fields from stat-full-meta / statdata_meta attributes"))
+        warnings_list.append(_bilingual("R fallback path: restored all 17 metadata fields from stat-full-meta / statdata_meta attributes", "R 回退路径：从 stat-full-meta / statdata_meta 属性还原全部 17 字段元数据"))
     elif col_labels_parsed:
         var_labels = col_labels_parsed
-        warnings_list.append(_bilingual("R 回退路径：从 R 原生 attributes 提取列标签", "R fallback path: extracted column labels from R native attributes"))
+        warnings_list.append(_bilingual("R fallback path: extracted column labels from R native attributes", "R 回退路径：从 R 原生 attributes 提取列标签"))
     
     if obj_label:
-        warnings_list.append(_bilingual(f"文件标签（OBJ_LABEL）已提取", f"File label (OBJ_LABEL) extracted"))
+        warnings_list.append(_bilingual(f"File label (OBJ_LABEL) extracted", f"文件标签（OBJ_LABEL）已提取"))
 
     r_metadata = {
         "r_objects_in_file": r_objects_info,
@@ -429,7 +429,7 @@ def _read_r(filepath, timestamp, *, format_type, object_name=None) -> StatFileRe
         if format_type == "r_rds":
             result_r = pyreadr.read_r(filepath)
             if not result_r:
-                raise ValueError(_bilingual("RDS 文件为空或无法解析", "RDS file is empty or cannot be parsed"))
+                raise ValueError(_bilingual("RDS file is empty or cannot be parsed", "RDS 文件为空或无法解析"))
             key = list(result_r.keys())[0]
             obj = result_r[key]
             r_object_name = key
@@ -442,7 +442,7 @@ def _read_r(filepath, timestamp, *, format_type, object_name=None) -> StatFileRe
         else:
             result_r = pyreadr.read_r(filepath)
             if not result_r:
-                raise ValueError(_bilingual("RDA 文件为空或无法解析", "RDA file is empty or cannot be parsed"))
+                raise ValueError(_bilingual("RDA file is empty or cannot be parsed", "RDA 文件为空或无法解析"))
 
             r_objects_info = {}
             for k, v in result_r.items():
@@ -450,7 +450,7 @@ def _read_r(filepath, timestamp, *, format_type, object_name=None) -> StatFileRe
 
             if object_name is not None:
                 if object_name not in result_r:
-                    raise ValueError(_bilingual(f"RDA 文件中不存在对象 '{object_name}'。可用对象: {list(result_r.keys())}", f"Object '{object_name}' not found in RDA file. Available: {list(result_r.keys())}"))
+                    raise ValueError(_bilingual(f"Object '{object_name}' not found in RDA file. Available: {list(result_r.keys())}", f"RDA 文件中不存在对象 '{object_name}'。可用对象: {list(result_r.keys())}"))
                 obj = result_r[object_name]
                 r_object_name = object_name
                 if isinstance(obj, pd.DataFrame):
@@ -480,8 +480,8 @@ def _read_r(filepath, timestamp, *, format_type, object_name=None) -> StatFileRe
                     r_object_name = first_key
                     warnings_list.extend(conversion_warnings)
                     warnings_list.append(_bilingual(
-                        f"RDA 文件包含多个对象 {list(result_r.keys())}，已尝试转换第一个对象 '{first_key}'。建议使用 object_name 指定对象，或使用 read_all_r_objects() 读入全部对象",
-                        f"RDA file contains multiple objects {list(result_r.keys())}, attempted to convert first object '{first_key}'. Recommend using object_name to specify, or read_all_r_objects() to read all"
+                        f"RDA file contains multiple objects {list(result_r.keys())}, attempted to convert first object '{first_key}'. Recommend using object_name to specify, or read_all_r_objects() to read all",
+                        f"RDA 文件包含多个对象 {list(result_r.keys())}，已尝试转换第一个对象 '{first_key}'。建议使用 object_name 指定对象，或使用 read_all_r_objects() 读入全部对象"
                     ))
     except pyreadr.custom_errors.LibrdataError as e:
         # 尝试自动回退到 R 脚本
@@ -541,7 +541,7 @@ def _read_r(filepath, timestamp, *, format_type, object_name=None) -> StatFileRe
             missing_user = embedded_meta['missing_user_values']
         if embedded_meta.get('column_names_to_labels'):
             col_to_label = embedded_meta['column_names_to_labels']
-        warnings_list.append(_bilingual("从 stat-full-meta 属性还原全部 17 字段元数据", "Restored all 17 metadata fields from stat-full-meta attribute"))
+        warnings_list.append(_bilingual("Restored all 17 metadata fields from stat-full-meta attribute", "从 stat-full-meta 属性还原全部 17 字段元数据"))
     
     # 同时从 R 原生 attributes 补充 column_labels（variable_labels）
     if not var_labels and 'column_labels' in r_attributes:
@@ -624,7 +624,7 @@ def _read_r_single(obj, object_name: str, timestamp: str) -> StatFileResult:
     elif hasattr(obj, '__iter__') and not isinstance(obj, str):
         try:
             df = pd.DataFrame(obj)
-            warnings_list.append(_bilingual(f"R 对象 '{object_name}' 类型为 {type(obj).__name__}，已尝试转换为 DataFrame", f"R object '{object_name}' of type {type(obj).__name__}, attempted conversion to DataFrame"))
+            warnings_list.append(_bilingual(f"R object '{object_name}' of type {type(obj).__name__}, attempted conversion to DataFrame", f"R 对象 '{object_name}' 类型为 {type(obj).__name__}，已尝试转换为 DataFrame"))
         except Exception as e:
             raise ValueError(f"R 对象 '{object_name}' 类型为 {type(obj).__name__}，无法转换为 DataFrame: {str(e)[:200]}")
     else:
@@ -870,11 +870,11 @@ def _convert_r_object_to_dataframe(obj, obj_name):
     if hasattr(obj, '__iter__') and not isinstance(obj, str):
         try:
             df = pd.DataFrame(obj)
-            warnings_list.append(_bilingual(f"R 对象 '{obj_name}' 类型为 {type(obj).__name__}，已尝试转换为 DataFrame", f"R object '{obj_name}' of type {type(obj).__name__}, attempted conversion to DataFrame"))
+            warnings_list.append(_bilingual(f"R object '{obj_name}' of type {type(obj).__name__}, attempted conversion to DataFrame", f"R 对象 '{obj_name}' 类型为 {type(obj).__name__}，已尝试转换为 DataFrame"))
             return df, warnings_list
         except Exception as e:
-            raise ValueError(_bilingual(f"R 对象 '{obj_name}' 类型为 {type(obj).__name__}，无法转换为 DataFrame: {str(e)[:200]}", f"R object '{obj_name}' of type {type(obj).__name__}, cannot be converted to DataFrame: {str(e)[:200]}"))
+            raise ValueError(_bilingual(f"R object '{obj_name}' of type {type(obj).__name__}, cannot be converted to DataFrame: {str(e)[:200]}", f"R 对象 '{obj_name}' 类型为 {type(obj).__name__}，无法转换为 DataFrame: {str(e)[:200]}"))
     else:
-        raise ValueError(_bilingual(f"R 对象 '{obj_name}' 类型为 {type(obj).__name__}，无法转换为 DataFrame", f"R object '{obj_name}' of type {type(obj).__name__}, cannot be converted to DataFrame"))
+        raise ValueError(_bilingual(f"R object '{obj_name}' of type {type(obj).__name__}, cannot be converted to DataFrame", f"R 对象 '{obj_name}' 类型为 {type(obj).__name__}，无法转换为 DataFrame"))
 
 

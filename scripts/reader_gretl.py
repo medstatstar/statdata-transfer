@@ -131,8 +131,8 @@ def _read_gdt(filepath: str, timestamp: str) -> StatFileResult:
             df = pd.DataFrame(columns=col_names)
         elif arr.shape[1] != n_vars:
             warnings_list.append(_bilingual(
-                f"数据列数 ({arr.shape[1]}) 与变量定义数 ({n_vars}) 不匹配，部分数据可能丢失",
-                f"Data column count ({arr.shape[1]}) does not match variable definition count ({n_vars}), some data may be lost"
+                f"Data column count ({arr.shape[1]}) does not match variable definition count ({n_vars}), some data may be lost",
+                f"数据列数 ({arr.shape[1]}) 与变量定义数 ({n_vars}) 不匹配，部分数据可能丢失"
             ))
             n_vars = min(arr.shape[1], n_vars)
             col_names = col_names[:n_vars]

@@ -354,7 +354,7 @@ def _write_r_via_subprocess(df, filepath, metadata=None, object_name="df", save_
     
     r_exe = _check_r_available()
     if not r_exe:
-        raise RuntimeError(_bilingual("R 未安装，无法写入 R 格式文件。请先配置 R 环境。", "R is not installed, cannot write R format file. Please configure R environment first."))
+        raise RuntimeError(_bilingual("R is not installed, cannot write R format file. Please configure R environment first.", "R 未安装，无法写入 R 格式文件。请先配置 R 环境。"))
     
     filepath_fwd = filepath.replace("\\", "/")
     tmp_csv = tempfile.NamedTemporaryFile(suffix='.csv', delete=False, mode='w', encoding='utf-8')
@@ -381,12 +381,12 @@ def _write_r_via_subprocess(df, filepath, metadata=None, object_name="df", save_
         )
         if result.returncode != 0:
             err = result.stderr.strip()
-            raise RuntimeError(_bilingual(f"R 写入失败: {err}", f"R write failed: {err}"))
+            raise RuntimeError(_bilingual(f"R write failed: {err}", f"R 写入失败: {err}"))
     
     except Exception as e:
         if isinstance(e, RuntimeError):
             raise
-        raise RuntimeError(_bilingual(f"R 写入失败: {e}", f"R write failed: {e}"))
+        raise RuntimeError(_bilingual(f"R write failed: {e}", f"R 写入失败: {e}"))
     
     finally:
         if os.path.exists(tmp_csv.name):
@@ -477,7 +477,7 @@ def _write_xpt(df, filepath, metadata=None):
     import pyreadstat
     
     var_labels = _get_variable_labels(metadata)
-    column_labels = [var_labels.get(col, col)[:40] for col in df.columns]
+    column_labels = [(var_labels.get(col) or col)[:40] for col in df.columns]
     val_labels = _get_value_labels(metadata)
     variable_value_labels = _pyreadstat_value_labels(val_labels, list(df.columns))
     file_label = (metadata.get("file_label", "") or "")[:40] if metadata else ""
@@ -670,7 +670,7 @@ def write_stat_file(dataframe, filepath, metadata=None, **kwargs):
     
     if ext not in _SUPPORT_WRITERS:
         supported = ", ".join(sorted(_SUPPORT_WRITERS.keys()))
-        raise ValueError(_bilingual(f"不支持的写入格式: {ext}\\n支持的格式: {supported}", f"Unsupported write format: {ext}\\nSupported formats: {supported}"))
+        raise ValueError(_bilingual(f"Unsupported write format: {ext}\\nSupported formats: {supported}", f"不支持的写入格式: {ext}\\n支持的格式: {supported}"))
     
     writer_func = _SUPPORT_WRITERS[ext]
     

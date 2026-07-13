@@ -124,12 +124,12 @@ def _read_arff(filepath: str, timestamp: str, encoding: str = "utf-8") -> StatFi
                     data_lines.append(values)
     
     if not data_lines:
-        warnings_list.append(_bilingual("ARFF 文件不包含 @data 数据区，仅能读取元数据", "ARFF file does not contain @data section, only metadata can be read"))
+        warnings_list.append(_bilingual("ARFF file does not contain @data section, only metadata can be read", "ARFF 文件不包含 @data 数据区，仅能读取元数据"))
     
     # Build DataFrame
     n_cols = len(attributes)
     if n_cols == 0:
-        warnings_list.append(_bilingual("ARFF 文件无 @attribute 定义", "ARFF file has no @attribute definitions"))
+        warnings_list.append(_bilingual("ARFF file has no @attribute definitions", "ARFF 文件无 @attribute 定义"))
     
     # Initialize data matrix
     data = np.full((len(data_lines), n_cols), None, dtype=object) if data_lines else np.empty((0, n_cols), dtype=object)
