@@ -1,7 +1,7 @@
 ---
 name: statdata-transfer
 cn_name: 统计数据格式转换器
-description: "读入/转存 50+ 统计软件格式（含 SPSS/Stata/SAS/R/Excel/Parquet/Tableau Hyper/HDF5/JSON/MATLAB/Weka ARFF/Gretl/EpiInfo/MS Access/dBASE/Origin/Mathematica/CDISC ODM/JMP/jamovi/Minitab/Feather/FST/ORC/ODS/HTML/XML/CSV…），对统计二进制格式完整保留变量标签/值标签/特殊缺失值等元数据；支持任意格式双向互转。Read/Convert 50+ statistical software formats with full metadata preservation for binary stats formats; bidirectionally convert any formats."
+description: "读入/转存 50+ 统计软件格式。对 SPSS/Stata/SAS/R 等统计二进制格式完整保留变量标签/值标签/特殊缺失值等元数据；文本格式保留部分元数据；12 种专有格式提供探测降级+导出指引。支持任意双向互转（部分受限于格式规范）。Read/Convert 50+ statistical software formats with full metadata preservation for binary stats formats; bidirectionally convert between most formats."
 triggers:
   - "statdata-transfer"
   - "统计数据格式转换"
@@ -29,8 +29,8 @@ metadata:
 
 | Ability | Description | 能力 | 说明 |
 |---------|-------------|------|------|
-| Read | SPSS/Stata/SAS/R … full metadata (var/val labels, special missing, MR sets); text/JSON keep subset | 读入 | 统计二进制格式完整保留元数据；文本/JSON 保留子集 |
-| Convert | Bidirectional: SPSS↔Stata↔R↔SAS↔Excel↔Parquet↔HDF5↔JSON… | 转存 | 任意格式双向互转 |
+| Read | SPSS/Stata/SAS/R … full metadata; text/JSON/detect-only keep subset | 读入 | 统计二进制格式完整保留元数据；文本/JSON 保留子集；12 种专有格式探测降级 |
+| Convert | Inter-convert most stats formats: SPSS↔Stata↔R↔SAS XPT↔… | 转存 | 多数统计格式可互转（部分受限于规范） |
 | Embed | Labels embed in Parquet/Feather/HDF5/JSON via schema.metadata | 元数据嵌入 | 标签嵌入 Arrow schema.metadata |
 | Warn | Auto-detect metadata loss per conversion path | 丢失警告 | 自动检测并报告元数据损失 |
 
@@ -47,7 +47,7 @@ metadata:
 | Excel | `.xlsx` `.xls` `.xlsm` | ⚠️ Extra sheet for labels; merged-cell fill |
 | EViews | `.wf1` `.wf2` | ⚠️ JSON structure |
 | Feather | `.feather` `.arrow` | ✅ Via schema |
-| FST | `.fst` | ✅ Via schema |
+| FST | `.fst` | ✗ Detect-only (proprietary format) |
 | GraphPad Prism | `.pzfx` `.pz` | ⚠️ Multi-table |
 | Gretl | `.gdt` `.gdtb` | ✅ String-tables |
 | HDF5 | `.h5` `.hdf5` | ⚠️ Hierarchy + attribute labels |

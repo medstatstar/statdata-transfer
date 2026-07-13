@@ -4,7 +4,7 @@
 
 ---
 
-读入 50+ 统计软件及临床试验数据格式（CDISC ODM/EpiData/EpiInfo/Excel/EViews/Feather/FST/GraphPad Prism/Gretl/HDF5/HTML/jamovi/JMP/JSON/MATLAB/Minitab/ODS/ORC/Parquet/R/SAS/SPSS/Stata/Weka ARFF/XML），转换为 Python/pandas DataFrame，并**支持任意格式双向互转**（SPSS↔Stata↔R↔SAS↔Excel↔Parquet↔HDF5↔JSON…）。对统计二进制格式（SPSS/Stata/SAS/R/Excel/Parquet/HDF5…）完整保留变量标签、值标签等元数据；文本格式（CSV/XML/HTML/ODS）与 JSON 仅保留可保留的子集——详见「格式限制」。
+读入 50+ 统计软件及临床试验数据格式，转换为 Python/pandas DataFrame，并**支持多数格式双向互转**（SPSS↔Stata↔R↔SAS XPT↔Excel↔Parquet↔HDF5↔JSON…）。对统计二进制格式（SPSS/Stata/SAS/R/Excel/Parquet/HDF5…）完整保留变量标签、值标签等元数据；文本格式（CSV/XML/HTML/ODS）与 JSON 仅保留可保留的子集——详见「格式限制」。**12 种专有格式**（SAS CPORT、Statistica、OxMetrics、SYSTAT、Paradox、LIMDEP、NCSS、FST 等）为**探测降级**——技能识别扩展名并给出清晰导出指引，但不解析数据。
 
 注意：本技能不需要任何统计软件的支持，但功能仅限于数据格式转换。如果需要**AI 智能体接入已安装的统计软件进行分析**，请使用 **[statsoft-cli](https://github.com/medstatstar/statsoft-cli)** 技能。
 
@@ -34,7 +34,7 @@
 | Excel | `.xlsx` `.xls` `.xlsm` | openpyxl / xlrd | ✗ | ✗ | ✗ | ⚠️ 仅结果 | ⚠️ 写出用额外工作表；合并单元格填充 |
 | EViews | `.wf1` `.wf2` | 内置 | ✗ | ✗ | ✗ | ✗ | ⚠️ JSON 结构 |
 | Feather | `.feather` `.arrow` | pyarrow | ✅(schema) | ✅(schema) | ✗ | ✗ | ⚠️ 版本差异 |
-| FST | `.fst` | fst (R) | ✅(schema) | ✅(schema) | ✗ | ✗ | ⚠️ 版本差异 |
+| FST | `.fst` | — | ✗ | ✗ | ✗ | ✗ | ✗ 探测降级（专有格式） |
 | GraphPad Prism | `.pzfx` `.pz` | pzfx | ✗ | ✗ | ✗ | ✗ | ⚠️ 多表 |
 | Gretl | `.gdt` `.gdtb` | 内置 | ✅ | ✅(tables) | ✗ | ✗ | ✅ string-tables |
 | HDF5 | `.h5` `.hdf5` | h5py | ✗ | ✗ | ✗ | ✗ | ⚠️ 层级结构 + 属性标签 |
@@ -64,6 +64,7 @@
 
 | 格式 | 扩展名 | 导出指引 |
 |------|--------|---------|
+| FST (R fst 包) | `.fst` | R: `fst::read_fst("in.fst", "out.csv")`，再读 CSV |
 | LIMDEP / NLOGIT | `.lpw` | 从原软件导出 CSV |
 | NCSS | `.ncss` | 导出 CSV |
 | OxMetrics | `.in7` | 导出 CSV / `.dta` |
@@ -93,7 +94,7 @@
 
 ### 读入降损规则
 1. **统计二进制格式**（SPSS/Stata/SAS/R）：100% 元数据完整保留
-2. **Arrow 生态**（Parquet/Feather/ORC/FST）：仅还原 `write_stat_file` 写入的标签
+2. **Arrow 生态**（Parquet/Feather/ORC）：仅还原 `write_stat_file` 写入的标签
 3. **非统计格式**（CSV/Excel/XML/HTML/ODS）：仅保留数据值；可使用 `apply_value_labels()` 手动附加
 4. **R 格式**：v1.6.0+ 通过 `statdata_meta` 属性嵌入全部元数据
 
@@ -105,7 +106,7 @@
 - 文件标签/注释不保留
 - 日期基准不保存
 
-## 提供输入文件 | Providing Input File
+## 提供输入文件
 
 AI 智能体（如 WorkBuddy）只能直接上传有限类型的文件。当数据文件无法直接上传时，有两种方式：
 

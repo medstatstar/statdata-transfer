@@ -4,7 +4,7 @@
 
 ---
 
-Read 50+ statistical software and clinical trial data formats (CDISC ODM/EpiData/EpiInfo/Excel/EViews/Feather/FST/GraphPad Prism/Gretl/HDF5/HTML/jamovi/JMP/JSON/MATLAB/Minitab/ODS/ORC/Parquet/R/SAS/SPSS/Stata/Weka ARFF/XML) into Python/pandas DataFrame, and **bidirectionally convert between any formats** (SPSS↔Stata↔R↔SAS↔Excel↔Parquet↔HDF5↔JSON…). For statistical binary formats (SPSS/Stata/SAS/R/Excel/Parquet/HDF5/…) it preserves full variable/value labels and missing-value metadata; text formats (CSV/XML/HTML/ODS) and JSON preserve only a retainable subset — see Format Limits below.
+Read 50+ statistical software and clinical trial data formats into Python/pandas DataFrame, and **inter-convert between most formats** (SPSS↔Stata↔R↔SAS XPT↔Excel↔Parquet↔HDF5↔JSON…). For statistical binary formats (SPSS/Stata/SAS/R/Excel/Parquet/HDF5/…) it preserves full variable/value labels and missing-value metadata; text formats (CSV/XML/HTML/ODS) and JSON preserve only a retainable subset — see Format Limits below. **12 proprietary formats** (SAS CPORT, Statistica, OxMetrics, SYSTAT, Paradox, LIMDEP, NCSS, FST, etc.) are **detect-only** — the skill recognizes the extension and provides clear export guidance, but does not parse the data.
 
 Note: This skill does not require any statistical software, but handles data format conversion only. If you need **an AI agent to integrate with installed statistical software for analysis**, use the **[statsoft-cli](https://github.com/medstatstar/statsoft-cli)** skill instead.
 
@@ -34,7 +34,7 @@ Automatically detects and reports metadata preservation vs loss during conversio
 | Excel | `.xlsx` `.xls` `.xlsm` | openpyxl / xlrd | ✗ | ✗ | ✗ | ⚠️ result only | ⚠️ Extra sheet for labels; merged-cell fill |
 | EViews | `.wf1` `.wf2` | built-in | ✗ | ✗ | ✗ | ✗ | ⚠️ JSON structure |
 | Feather | `.feather` `.arrow` | pyarrow | ✅(schema) | ✅(schema) | ✗ | ✗ | ⚠️ Version diff |
-| FST | `.fst` | fst (R) | ✅(schema) | ✅(schema) | ✗ | ✗ | ⚠️ Version diff |
+| FST | `.fst` | — | ✗ | ✗ | ✗ | ✗ | ✗ Detect-only (proprietary format) |
 | GraphPad Prism | `.pzfx` `.pz` | pzfx | ✗ | ✗ | ✗ | ✗ | ⚠️ Multi-table |
 | Gretl | `.gdt` `.gdtb` | built-in | ✅ | ✅(tables) | ✗ | ✗ | ✅ string-tables |
 | HDF5 | `.h5` `.hdf5` | h5py | ✗ | ✗ | ✗ | ✗ | ⚠️ Hierarchy + attribute labels |
@@ -64,6 +64,7 @@ Formats with no parser available. The skill detects the extension and provides c
 
 | Format | Extension | Guidance |
 |--------|-----------|----------|
+| FST (R fst package) | `.fst` | R: `fst::read_fst("in.fst", "out.csv")` then read CSV |
 | LIMDEP / NLOGIT | `.lpw` | Export to CSV from original software |
 | NCSS | `.ncss` | Export to CSV |
 | OxMetrics | `.in7` | Export to CSV / `.dta` |
@@ -93,7 +94,7 @@ Formats with no parser available. The skill detects the extension and provides c
 
 ### Read Fallback Rules
 1. **Statistical binary formats** (SPSS/Stata/SAS/R): 100% metadata preserved
-2. **Arrow ecosystem** (Parquet/Feather/ORC/FST): Only restores labels from `write_stat_file`
+2. **Arrow ecosystem** (Parquet/Feather/ORC): Only restores labels from `write_stat_file`
 3. **Non-stats formats** (CSV/Excel/XML/HTML/ODS): Data only; use `apply_value_labels()` to attach manually
 4. **R formats**: v1.6.0+ embeds all metadata via `statdata_meta` attribute
 

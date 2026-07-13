@@ -984,20 +984,22 @@ def _read_orc(filepath: str, timestamp: str) -> StatFileResult:
 
 
 def _read_fst(filepath: str, timestamp: str) -> StatFileResult:
-    """读入 FST 文件（R fst 包生成，底层为 feather/Arrow IPC 格式），使用 pyarrow.feather.read_table。"""
-    import pyarrow.feather as ft
+    """FST (R fst package) 是专有压缩列式格式，pyarrow.feather 无法解析。
 
-    warnings_list = []
-    fst_metadata: dict[str, Any] = {}
-
-    # FST files from R's fst package are Arrow IPC/Feather format
-    table = ft.read_table(filepath)
-    df = table.to_pandas()
-
-    schema = table.schema
-    fst_metadata["schema"] = str(schema)
-    fst_metadata["num_rows"] = table.num_rows
-    fst_metadata["num_columns"] = table.num_columns
+    若确有 .fst 转换需求，请用 R 桥接：install.packages("fst"); fst::read_fst("in.fst", "out.csv")，
+    然后读取 .csv；或直接联系作者加装 fst Python 解析库。
+    """
+    ext = os.path.splitext(filepath)[1].lower()
+    raise RuntimeError(
+        _bilingual(
+            f"Direct reading of R {ext} (fst package) is not yet supported.\n"
+            f"R's fst format is a proprietary compressed columnar format incompatible with Arrow IPC / Feather.\n"
+            f"Workaround: in R, run `install.packages('fst'); fst::read_fst('{filepath}', '/tmp/out.csv')` then read the CSV.",
+            f"暂不支持直接读取 R {ext} (fst 包格式)。\n"
+            f"R 的 fst 格式是有损专有压缩列式格式，与 Arrow IPC / Feathers 不兼容。\n"
+            f"折中方案：在 R 中运行 `install.packages('fst'); fst::read_fst('{filepath}', '/tmp/out.csv')`，然后读取 CSV。",
+        )
+    )
 
     # Column info
     col_info_list = []
