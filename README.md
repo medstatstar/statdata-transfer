@@ -247,6 +247,13 @@ To add a new format: edit `scripts/reader_*.py` to add a reader function, regist
 - ✅ Pre-v13 Latin-1 auto-detected
 - ❌ Stata 117-119 not supported by pyreadstat 1.3.5; auto-downgrade to v15 on write
 
+## Security
+
+- **R deserialization is sandboxed by default.** `.rda/.rds/.RData` files are read with the pure-Python `pyreadr` parser (no code execution). If `pyreadr` fails, the skill raises a clear error instead of silently falling back to the R interpreter. Loading untrusted objects via R's `readRDS()/load()` can execute embedded code, so the R-interpreter fallback is **disabled by default** and only runs when you explicitly pass `allow_r_exec=True` on a TRUSTED file.
+- **Optional package install.** `python scripts/check_env.py --install` runs only on explicit request.
+- **No destructive writes.** When writing a `.hyper` file that already exists, the existing file is backed up to `<file>.bak` before overwrite.
+- **Scope.** Statistical data formats only. No network access unless you explicitly request package installation.
+
 ## License
 
 MIT-0 License. See [LICENSE](LICENSE) for details.

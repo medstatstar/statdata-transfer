@@ -994,10 +994,10 @@ def _read_fst(filepath: str, timestamp: str) -> StatFileResult:
         _bilingual(
             f"Direct reading of R {ext} (fst package) is not yet supported.\n"
             f"R's fst format is a proprietary compressed columnar format incompatible with Arrow IPC / Feather.\n"
-            f"Workaround: in R, run `install.packages('fst'); fst::read_fst('{filepath}', '/tmp/out.csv')` then read the CSV.",
+            f"Workaround: in R, run `install.packages('fst'); fst::read_fst('{filepath}', 'out.csv')` then read the CSV.",
             f"暂不支持直接读取 R {ext} (fst 包格式)。\n"
             f"R 的 fst 格式是有损专有压缩列式格式，与 Arrow IPC / Feathers 不兼容。\n"
-            f"折中方案：在 R 中运行 `install.packages('fst'); fst::read_fst('{filepath}', '/tmp/out.csv')`，然后读取 CSV。",
+            f"折中方案：在 R 中运行 `install.packages('fst'); fst::read_fst('{filepath}', 'out.csv')`，然后读取 CSV。",
         )
     )
 

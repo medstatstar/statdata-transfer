@@ -690,6 +690,7 @@ def read_stat_file(
     sheet_name: str | None = None,
     object_name: str | None = None,
     table_name: str | None = None,
+    allow_r_exec: bool = False,
 ) -> StatFileResult:
     """读入统计软件格式文件，最大限度保留元数据。
 
@@ -784,9 +785,9 @@ def read_stat_file(
         "spss_por": lambda: reader_spss._read_spss(filepath, timestamp,
                                                    format_type="spss_por", user_missings=user_missings, encoding=encoding),
         "r_rda": lambda: reader_r._read_r(filepath, timestamp,
-                                          format_type="r_rda", object_name=object_name),
+                                          format_type="r_rda", object_name=object_name, allow_r_exec=allow_r_exec),
         "r_rds": lambda: reader_r._read_r(filepath, timestamp,
-                                          format_type="r_rds", object_name=object_name),
+                                          format_type="r_rds", object_name=object_name, allow_r_exec=allow_r_exec),
         "excel_xlsx": lambda: reader_excel._read_excel(filepath, timestamp,
                                                        format_type="excel_xlsx", encoding=encoding, sheet_name=sheet_name),
         "excel_xls": lambda: reader_excel._read_excel(filepath, timestamp,

@@ -358,7 +358,11 @@ def _write_hyper(df: pd.DataFrame, filepath: str, metadata: dict | None = None, 
     metadata = metadata or {}
 
     if os.path.exists(filepath):
-        os.remove(filepath)
+        # 安全：先备份已存在文件为 .bak，避免静默数据丢失（HyperProcess 用 CREATE_AND_REPLACE 写新文件）
+        backup = filepath + ".bak"
+        if os.path.exists(backup):
+            os.remove(backup)
+        os.rename(filepath, backup)
 
     hyper = HyperProcess(telemetry=HYPER_TELEMETRY)
     conn = Connection(

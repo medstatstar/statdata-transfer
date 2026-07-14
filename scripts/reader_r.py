@@ -218,7 +218,7 @@ def _check_r_available() -> str | None:
 
 
 def _read_r_via_rscript(filepath: str, format_type: str, object_name: str | None,
-                        timestamp: str) -> StatFileResult:
+                        timestamp: str, allow_r_exec: bool = False) -> StatFileResult:
     """通过 Rscript 调用 R 读入 RDA/RDS 文件，作为 pyreadr 失败的后备方案。
 
     工作流程：
@@ -235,6 +235,12 @@ def _read_r_via_rscript(filepath: str, format_type: str, object_name: str | None
     import tempfile
 
     warnings_list = []
+
+    if not allow_r_exec:
+        raise RuntimeError(_bilingual(
+            "Reading this R file requires invoking the local R interpreter to deserialize objects (readRDS/load), which can execute embedded code from untrusted files. To proceed with a TRUSTED file, pass allow_r_exec=True.",
+            "读入此 R 文件需调用本地 R 解释器反序列化对象（readRDS/load），可能执行不可信文件中的嵌入代码。若文件可信，请传入 allow_r_exec=True 继续。"
+        ))
 
     rscript_path = _check_r_available()
     if not rscript_path:
@@ -419,7 +425,7 @@ def _read_r_via_rscript(filepath: str, format_type: str, object_name: str | None
 
 
 
-def _read_r(filepath, timestamp, *, format_type, object_name=None) -> StatFileResult:
+def _read_r(filepath, timestamp, *, format_type, object_name=None, allow_r_exec: bool = False) -> StatFileResult:
     import pyreadr
 
     warnings_list = []
@@ -484,23 +490,24 @@ def _read_r(filepath, timestamp, *, format_type, object_name=None) -> StatFileRe
                         f"RDA 文件包含多个对象 {list(result_r.keys())}，已尝试转换第一个对象 '{first_key}'。建议使用 object_name 指定对象，或使用 read_all_r_objects() 读入全部对象"
                     ))
     except pyreadr.custom_errors.LibrdataError as e:
-        # 尝试自动回退到 R 脚本
-        rscript_path = _check_r_available()
-        if rscript_path:
-            return _read_r_via_rscript(filepath, format_type, object_name, timestamp)
-        else:
-            _check_pyreadr_rda_error(filepath, e)
-            raise
+        # 安全闸门：R 解释器回退默认禁用（readRDS/load 可能执行不可信文件中的嵌入代码）
+        if allow_r_exec:
+            return _read_r_via_rscript(filepath, format_type, object_name, timestamp, allow_r_exec=allow_r_exec)
+        _check_pyreadr_rda_error(filepath, e)
+        raise RuntimeError(_bilingual(
+            "pyreadr failed and the R-interpreter fallback is disabled by default for security (readRDS/load can execute embedded code from untrusted files). If the file is TRUSTED, retry with allow_r_exec=True.",
+            "pyreadr 解析失败，且出于安全默认禁用 R 解释器回退（readRDS/load 可能执行不可信文件中的嵌入代码）。若文件可信，请使用 allow_r_exec=True 重试。"
+        ))
     except (ValueError, UnicodeDecodeError) as e:
-        rscript_path = _check_r_available()
-        if rscript_path:
-            return _read_r_via_rscript(filepath, format_type, object_name, timestamp)
+        # 安全闸门：R 解释器回退默认禁用
+        if allow_r_exec:
+            return _read_r_via_rscript(filepath, format_type, object_name, timestamp, allow_r_exec=allow_r_exec)
         raise
 
     # 提取 R 属性（含 stat-full-meta / statdata_meta 元数据）
     # pyreadr 不保留 R 对象属性，需用 R script 直接从 R 文件提取 statdata_meta
     r_attributes = _extract_r_attributes(df)
-    embedded_meta_from_r = _extract_embedded_r_metadata(filepath, format_type, object_name)
+    embedded_meta_from_r = _extract_embedded_r_metadata(filepath, format_type, object_name, allow_r_exec=allow_r_exec)
     if embedded_meta_from_r:
         r_attributes['statdata_meta'] = embedded_meta_from_r
     
@@ -769,9 +776,14 @@ def _extract_r_attributes(obj: Any) -> dict[str, Any]:
     return attributes
 
 
-def _extract_embedded_r_metadata(filepath: str, format_type: str, object_name: str | None) -> dict:
-    """通过 R script 直接从 R 文件提取 statdata_meta 属性（pyreadr 不保留 R 属性）"""
+def _extract_embedded_r_metadata(filepath: str, format_type: str, object_name: str | None, allow_r_exec: bool = False) -> dict:
+    """通过 R script 直接从 R 文件提取 statdata_meta 属性（pyreadr 不保留 R 属性）。
+
+    安全默认：allow_r_exec=False 时不调用 R 解释器（避免对不可信文件反序列化）。
+    """
     try:
+        if not allow_r_exec:
+            return {}  # 安全默认：不调用 R 解释器加载文件
         rscript_path = _check_r_available()
         if not rscript_path:
             return {}
@@ -801,7 +813,7 @@ def _extract_embedded_r_metadata(filepath: str, format_type: str, object_name: s
         return {}
 
 
-def read_all_r_objects_inner(filepath: str) -> dict[str, StatFileResult]:
+def read_all_r_objects_inner(filepath: str, *, allow_r_exec: bool = False) -> dict[str, StatFileResult]:
     """Read all R objects from a .rda file. Returns {object_name: StatFileResult}."""
     import pyreadr
     
@@ -811,10 +823,15 @@ def read_all_r_objects_inner(filepath: str) -> dict[str, StatFileResult]:
     try:
         result_r = pyreadr.read_r(filepath)
     except Exception as e:
-        rscript_path = _check_r_available()
-        if rscript_path:
-            return _read_all_r_objects_via_rscript(filepath, rscript_path)
-        raise RuntimeError(f"Cannot read R file and R is not available: {e}")
+        # 安全闸门：R 解释器回退默认禁用
+        if allow_r_exec:
+            rscript_path = _check_r_available()
+            if rscript_path:
+                return _read_all_r_objects_via_rscript(filepath, rscript_path, allow_r_exec=allow_r_exec)
+        raise RuntimeError(_bilingual(
+            "pyreadr failed and the R-interpreter fallback is disabled by default for security. If the file is TRUSTED, retry with allow_r_exec=True.",
+            "pyreadr 解析失败，且出于安全默认禁用 R 解释器回退。若文件可信，请使用 allow_r_exec=True 重试。"
+        ))
     
     timestamp = datetime.now().isoformat(timespec="seconds")
     results = {}
@@ -829,8 +846,13 @@ def read_all_r_objects_inner(filepath: str) -> dict[str, StatFileResult]:
     return results
 
 
-def _read_all_r_objects_via_rscript(filepath: str, rscript_path: str) -> dict[str, StatFileResult]:
+def _read_all_r_objects_via_rscript(filepath: str, rscript_path: str, allow_r_exec: bool = False) -> dict[str, StatFileResult]:
     """Fallback: list all data frames in RDA via R, then extract each."""
+    if not allow_r_exec:
+        raise RuntimeError(_bilingual(
+            "Reading this R file requires invoking the local R interpreter (load/readRDS), which can execute embedded code from untrusted files. To proceed with a TRUSTED file, pass allow_r_exec=True.",
+            "读入此 R 文件需调用本地 R 解释器（load/readRDS），可能执行不可信文件中的嵌入代码。若文件可信，请传入 allow_r_exec=True 继续。"
+        ))
     filepath_r = filepath.replace("\\", "/")
 
     # 安全：静态脚本 + 命令行参数传入路径，杜绝命令注入

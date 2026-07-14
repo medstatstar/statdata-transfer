@@ -1,7 +1,7 @@
 ---
 name: statdata-transfer
 cn_name: 统计数据格式转换器
-description: "读入/转存 50+ 统计软件格式。对 SPSS/Stata/SAS/R 等统计二进制格式完整保留变量标签/值标签/特殊缺失值等元数据；文本格式保留部分元数据；12 种专有格式提供探测降级+导出指引。支持任意双向互转（部分受限于格式规范）。Read/Convert 50+ statistical software formats with full metadata preservation for binary stats formats; bidirectionally convert between most formats."
+description: "Read/convert 50+ statistical software formats, preserving variable/value labels and missing-value metadata for binary stats formats. Side effects (declared): runs environment checks (scripts/check_env.py); may optionally pip-install missing packages on request; can invoke the local R interpreter for .rda/.rds/.RData/.mtw/.rec files via a fallback that is DISABLED by default and must be opted in with allow_r_exec=True. 读入/转存 50+ 统计软件格式，对统计二进制格式完整保留变量标签/值标签/特殊缺失值等元数据。副作用声明：运行环境检查（scripts/check_env.py）；可应要求 pip 安装缺失包；处理 .rda/.rds/.RData/.mtw/.rec 文件时可调用本地 R 解释器，但该回退默认禁用，需 allow_r_exec=True 显式开启。"
 triggers:
   - "statdata-transfer"
   - "统计数据格式转换"
@@ -63,7 +63,7 @@ metadata:
 | ORC | `.orc` | ✅ Via schema |
 | Origin | `.opju` `.oggu` | ⚠️ Best-effort |
 | Parquet | `.parquet` | ✅ Via schema; partitioned datasets |
-| R | `.rda` `.rds` `.rdata` | ✅ statdata_meta + R bridge |
+| R | `.rda` `.rds` `.rdata` | ✅ pyreadr; R-interpreter fallback opt-in (allow_r_exec) |
 | SAS | `.sas7bdat` `.xpt` `.sas7bcat` | ✅ |
 | SPSS | `.sav` `.zsav` `.por` | ✅ |
 | Stata | `.dta` | ✅ |
@@ -125,9 +125,11 @@ requires:
 
 ## Security | 安全
 
-- **R bridge (`.rda/.rds/.RData`, `.mtw`, `.rec` write)**: All R scripts are **fully static templates**; user inputs passed only as CLI args (`commandArgs(trailingOnly=TRUE)` via `jsonlite`) — **never concatenated into executable R code**. Random temp filenames; no fixed paths.
-- **Optional install**: `python scripts/check_env.py --install` only runs on explicit request.
-- **Scope**: Statistical data formats only. Text/JSON formats preserve metadata subset only — see «Format Limits» in README.
+- **R deserialization is sandboxed by default | R 反序列化默认隔离**: `.rda/.rds/.RData` files are read with the pure-Python `pyreadr` parser (no code execution). If `pyreadr` fails, the skill does **NOT** silently fall back to the real R interpreter — instead it raises a clear error. Loading untrusted objects via R's `readRDS()/load()` can execute embedded code, so the R-interpreter fallback is **disabled by default** and only runs when you explicitly pass `allow_r_exec=True` on a TRUSTED file.
+- **R scripts are static templates | R 脚本为静态模板**: When the opt-in R path is used, all R scripts are fully static templates; user inputs are passed only as CLI args (`commandArgs(trailingOnly=TRUE)` via `jsonlite`) — **never concatenated into executable R code**. Random temp filenames; no fixed paths.
+- **Optional install | 可选安装**: `python scripts/check_env.py --install` only runs on explicit request.
+- **Permissions required | 所需权限**: Read the input file; write the output file to a path you specify. No network access unless you explicitly request package installation. No destructive writes — existing `.hyper` outputs are backed up to `.bak` before overwrite.
+- **Scope | 范围**: Statistical data formats only. Text/JSON formats preserve metadata subset only — see «Format Limits» in README.
 
 ## License | 许可证
 

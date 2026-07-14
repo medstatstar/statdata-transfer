@@ -247,6 +247,13 @@ WorkBuddy 对话示例：
 - ✅ 旧版 (pre-v13) Latin-1 编码已自动检测
 - ❌ Stata 117-119：pyreadstat 1.3.5 不支持，写回时自动降级为 version 15
 
+## 安全 | Security
+
+- **R 反序列化默认隔离 | R deserialization sandboxed**: `.rda/.rds/.RData` 文件用纯 Python 的 `pyreadr` 解析（无代码执行）。若 `pyreadr` 失败，技能会明确报错而非静默回退到 R 解释器。R 的 `readRDS()/load()` 加载不可信对象可能执行嵌入代码，因此 R 解释器回退**默认禁用**，仅当对可信文件显式传入 `allow_r_exec=True` 时运行。
+- **可选安装 | Optional install**: `python scripts/check_env.py --install` 仅在显式要求时运行。
+- **无破坏性写入 | No destructive writes**: 写入已存在的 `.hyper` 文件前，原文件先备份为 `<file>.bak`。
+- **范围 | Scope**: 仅统计数据格式。除非你显式要求安装包，否则不访问网络。
+
 ## 许可证
 
 MIT 许可证。详见 [LICENSE](LICENSE)。
