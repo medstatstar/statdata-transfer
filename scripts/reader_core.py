@@ -809,15 +809,15 @@ def read_stat_file(
         "odm_odm": lambda: reader_odm._read_odm(filepath, timestamp),
         "jmp_jmp": lambda: reader_v14._read_jmp(filepath, timestamp),
         "minitab_mtw": lambda: reader_v14._read_minitab(filepath, timestamp,
-                                                         format_type="minitab_mtw"),
+                                                         format_type="minitab_mtw", allow_r_exec=allow_r_exec),
         "minitab_mpj": lambda: reader_v14._read_minitab(filepath, timestamp,
-                                                         format_type="minitab_mpj"),
+                                                         format_type="minitab_mpj", allow_r_exec=allow_r_exec),
         "prism_pzfx": lambda: reader_v14._read_prism(filepath, timestamp,
                                                      format_type="prism_pzfx"),
         "prism_pz": lambda: reader_v14._read_prism(filepath, timestamp,
                                                    format_type="prism_pz"),
         "jamovi_omv": lambda: reader_v14._read_jamovi(filepath, timestamp),
-        "epidata_rec": lambda: reader_v14._read_epidata(filepath, timestamp),
+        "epidata_rec": lambda: reader_v14._read_epidata(filepath, timestamp, allow_r_exec=allow_r_exec),
         "eviews_wf1": lambda: reader_v14._read_eviews(filepath, timestamp,
                                                        format_type="eviews_wf1"),
         "eviews_wf2": lambda: reader_v14._read_eviews(filepath, timestamp,
@@ -905,12 +905,12 @@ def read_all_r_objects(filepath: str) -> dict[str, StatFileResult]:
 # 写入/转写接口
 # ============================================================
 
-def write_stat_file(dataframe, filepath, metadata=None, **kwargs):
+def write_stat_file(dataframe, filepath, metadata=None, *, allow_r_exec: bool = False, **kwargs):
     """
     Write DataFrame to specified format file.
-    
+
     Auto-selects writer based on file extension, preserves variable labels, value labels etc.
-    
+
     Parameters
     ----------
     dataframe : pd.DataFrame
@@ -918,14 +918,17 @@ def write_stat_file(dataframe, filepath, metadata=None, **kwargs):
         Output file path (extension determines format)
     metadata : dict, optional
         Metadata (variable_labels, value_labels etc.)
+    allow_r_exec : bool, default False
+        Gate for R-interpreter-backed writes (.rda/.rds). Disabled by default;
+        pass True only on a TRUSTED file/environment.
     **kwargs
         Additional arguments passed to the underlying writer
-    
+
     Supported formats: .sav, .zsav, .dta, .rda, .rds, .xlsx, .xpt, .csv, .tsv,
     .parquet, .hdf5, .feather, .json
     """
     from .writer import write_stat_file as _writer
-    return _writer(dataframe, filepath, metadata, **kwargs)
+    return _writer(dataframe, filepath, metadata, allow_r_exec=allow_r_exec, **kwargs)
 
 
 def convert_stat_file(src_path, dst_path, *, metadata=None, **kwargs):

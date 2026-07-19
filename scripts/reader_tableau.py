@@ -357,19 +357,20 @@ def _write_hyper(df: pd.DataFrame, filepath: str, metadata: dict | None = None, 
     warnings_list: list[str] = []
     metadata = metadata or {}
 
-    if os.path.exists(filepath):
-        # 安全：先备份已存在文件为 .bak，避免静默数据丢失（HyperProcess 用 CREATE_AND_REPLACE 写新文件）
-        backup = filepath + ".bak"
-        if os.path.exists(backup):
-            os.remove(backup)
-        os.rename(filepath, backup)
+    # 安全写入策略：先写临时目录内的 .hyper 文件，成功后再原子替换目标文件。
+    # 这样写入失败/异常时，原 filepath 完全不动，杜绝静默数据丢失。
+    # 用临时目录（而非 mkstemp 的空文件）以便 tableauhyperapi 自行创建新库。
+    import tempfile, shutil
+    tmp_dir = tempfile.mkdtemp(prefix="statdata_hyper_")
+    tmp_path = os.path.join(tmp_dir, "out.hyper")
 
     hyper = HyperProcess(telemetry=HYPER_TELEMETRY)
     conn = Connection(
         endpoint=hyper.endpoint,
-        database=filepath,
+        database=tmp_path,
         create_mode=CreateMode.CREATE_AND_REPLACE,
     )
+    success = False
     try:
         conn.catalog.create_schema(SchemaName(EXTRACT_SCHEMA))
         cols = []
@@ -405,8 +406,29 @@ def _write_hyper(df: pd.DataFrame, filepath: str, metadata: dict | None = None, 
                     "Tableau 等外部工具打开时仅见数据列",
                 )
             )
+        success = True
     finally:
         conn.close()
         hyper.close()
+
+    if success:
+        # 原子替换：先轮转备份 —— 永不静默删除 .bak，仅将其降级为 .bak.1
+        if os.path.exists(filepath):
+            backup = filepath + ".bak"
+            bak1 = filepath + ".bak.1"
+            if os.path.exists(backup):
+                if os.path.exists(bak1):
+                    try:
+                        os.remove(bak1)  # 只删最旧历史 .bak.1，不动 .bak
+                    except OSError:
+                        pass
+                os.rename(backup, bak1)
+            os.rename(filepath, backup)
+        os.replace(tmp_path, filepath)  # 跨平台原子替换
+    else:
+        # 写入失败：原 filepath 保持不变
+        pass
+    # 无论成功失败，清理临时目录
+    shutil.rmtree(tmp_dir, ignore_errors=True)
 
     return warnings_list

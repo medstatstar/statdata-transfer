@@ -190,7 +190,7 @@ def _read_jmp(filepath: str, timestamp: str) -> StatFileResult:
 
 
 
-def _read_minitab(filepath, timestamp, *, format_type):
+def _read_minitab(filepath, timestamp, *, format_type, allow_r_exec: bool = False):
     """读入 Minitab 工作簿文件 (.mtw/.mpj)。
     优先尝试 mtbpy；失败时通过 R foreign::read.mtb() 中继；
     都不可用则提示使用 @skill:statsoft-cli 配置 Minitab。
@@ -208,11 +208,19 @@ def _read_minitab(filepath, timestamp, *, format_type):
         warnings_list.append(_bilingual("Read Minitab file via mtbpy", "通过 mtbpy 读入 Minitab 文件"))
         meta_extra = {"read_via": "mtbpy"}
     except ImportError:
-        # 2. 尝试 R foreign::read.mtb() 中继
+        # 2. 尝试 R foreign::read.mtb() 中继（需显式开启，默认隔离）
+        if not allow_r_exec:
+            raise RuntimeError(
+                "Minitab software not installed and the R-interpreter bridge is disabled by default for security "
+                "(invoking R on untrusted files can execute embedded code). "
+                "If the file is TRUSTED, install R+foreign and retry with allow_r_exec=True.\n"
+                "Minitab 软件未安装，且出于安全默认禁用 R 解释器中继（对不可信文件调用 R 可能执行嵌入代码）。"
+                "若文件可信，请安装 R+foreign 后用 allow_r_exec=True 重试。"
+            )
         rscript = _check_r_available()
         if rscript:
             warnings_list.append(_bilingual("Minitab software not installed, reading via R foreign package bridge", "Minitab 软件未安装，通过 R foreign 包中继读入"))
-            return _read_minitab_via_r(filepath, timestamp, format_type, rscript)
+            return _read_minitab_via_r(filepath, timestamp, format_type, rscript, allow_r_exec=allow_r_exec)
         # 3. 都不可用：提示用户
         raise RuntimeError(
             "读入 Minitab 文件需要 Minitab 软件。\\n"
@@ -316,7 +324,7 @@ library(foreign)
 data <- read.epiinfo(filepath)
 write.csv(data, file=out_csv, row.names=FALSE, fileEncoding='UTF-8')
 """
-def _read_minitab_via_r(filepath, timestamp, format_type, rscript_path):
+def _read_minitab_via_r(filepath, timestamp, format_type, rscript_path, allow_r_exec: bool = False):
     """通过 R foreign::read.mtb() 中继读入 Minitab 文件。"""
     import pandas as pd
 
@@ -519,7 +527,7 @@ def _read_jamovi(filepath, timestamp):
 
 
 
-def _read_epidata(filepath, timestamp):
+def _read_epidata(filepath, timestamp, *, allow_r_exec: bool = False):
     """读入 EpiData/Epi Info 数据文件 (.rec)。
     通过 R foreign 包中继（pyreadstat 不支持 .rec 格式）。
     """
@@ -528,9 +536,17 @@ def _read_epidata(filepath, timestamp):
     warnings_list = []
     warnings_list.append(_bilingual("EpiData format does not contain statistical metadata like variable/value labels, only raw data values", "EpiData 格式不含变量标签、值标签等统计元数据，仅保留原始数据值"))
 
+    if not allow_r_exec:
+        raise RuntimeError(
+            "Reading EpiData .rec requires invoking the local R interpreter (foreign::read.epiinfo), "
+            "which is disabled by default for security (R can execute embedded code from untrusted files). "
+            "If the file is TRUSTED, retry with allow_r_exec=True.\n"
+            "读入 EpiData .rec 需调用本地 R 解释器（foreign::read.epiinfo），出于安全默认禁用"
+            "（R 可能执行不可信文件中的嵌入代码）。若文件可信，请使用 allow_r_exec=True 重试。"
+        )
     rscript = _check_r_available()
     if rscript:
-        return _read_epidata_via_r(filepath, timestamp, rscript)
+        return _read_epidata_via_r(filepath, timestamp, rscript, allow_r_exec=allow_r_exec)
 
     raise RuntimeError(
         "读入 EpiData .rec 文件需要 R 及 foreign 包。\\n"
@@ -541,7 +557,7 @@ def _read_epidata(filepath, timestamp):
 
 
 
-def _read_epidata_via_r(filepath, timestamp, rscript_path):
+def _read_epidata_via_r(filepath, timestamp, rscript_path, allow_r_exec: bool = False):
     """通过 R foreign::read.epiinfo() 中继读入 EpiData .rec 文件。"""
     import pandas as pd
 

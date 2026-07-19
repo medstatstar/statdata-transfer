@@ -348,13 +348,21 @@ if (!is.null(lab$val_labels)) {
 if (nchar(full_meta_json) > 0) { attr(df, "statdata_meta") <- full_meta_json }
 if (save_func == "saveRDS") { saveRDS(df, out_path) } else { save(df, file=out_path) }
 """
-def _write_r_via_subprocess(df, filepath, metadata=None, object_name="df", save_func="save"):
+def _write_r_via_subprocess(df, filepath, metadata=None, object_name="df", save_func="save", allow_r_exec: bool = False):
     """通过 R subprocess 写入 R 格式文件，并将全部 17 个元数据字段保存为 R 数据属性"""
     from .reader_r import _check_r_available
     
     r_exe = _check_r_available()
     if not r_exe:
         raise RuntimeError(_bilingual("R is not installed, cannot write R format file. Please configure R environment first.", "R 未安装，无法写入 R 格式文件。请先配置 R 环境。"))
+    if not allow_r_exec:
+        raise RuntimeError(
+            "Writing R format files requires invoking the local R interpreter (saveRDS/save), "
+            "which is disabled by default for security (R can execute embedded code). "
+            "If you trust the environment, retry with allow_r_exec=True.\n"
+            "写入 R 格式文件需调用本地 R 解释器（saveRDS/save），出于安全默认禁用"
+            "（R 可能执行嵌入代码）。若信任环境，请使用 allow_r_exec=True 重试。"
+        )
     
     filepath_fwd = filepath.replace("\\", "/")
     tmp_csv = tempfile.NamedTemporaryFile(suffix='.csv', delete=False, mode='w', encoding='utf-8')
@@ -393,14 +401,14 @@ def _write_r_via_subprocess(df, filepath, metadata=None, object_name="df", save_
             os.unlink(tmp_csv.name)
 
 
-def _write_rda(df, filepath, metadata=None, *, object_name="df"):
+def _write_rda(df, filepath, metadata=None, *, object_name="df", allow_r_exec: bool = False):
     """写入 R .rda 格式"""
-    _write_r_via_subprocess(df, filepath, metadata, object_name, "save")
+    _write_r_via_subprocess(df, filepath, metadata, object_name, "save", allow_r_exec=allow_r_exec)
 
 
-def _write_rds(df, filepath, metadata=None):
+def _write_rds(df, filepath, metadata=None, *, allow_r_exec: bool = False):
     """写入 R .rds 格式"""
-    _write_r_via_subprocess(df, filepath, metadata, "df", "saveRDS")
+    _write_r_via_subprocess(df, filepath, metadata, "df", "saveRDS", allow_r_exec=allow_r_exec)
 
 
 # ============================================================
@@ -681,6 +689,12 @@ def write_stat_file(dataframe, filepath, metadata=None, **kwargs):
     # 传递 compress_zsav 参数给 zsav
     if ext == ".zsav":
         kwargs["compress_zsav"] = True
+
+    # 捕获 R 执行闸门：仅 R 格式（.rda/.rds）writer 接受此参数，
+    # 其余格式不接受，必须从 kwargs 中 pop 避免透传报错
+    allow_r_exec = kwargs.pop("allow_r_exec", False)
+    if ext in {".rda", ".rds"}:
+        kwargs["allow_r_exec"] = allow_r_exec
     
     # 对于非统计软件格式，检查元数据丢失
     warnings = []

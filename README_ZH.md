@@ -1,4 +1,4 @@
-# statdata-transfer | 统计数据格式转换器
+# statdata-transfer / 统计数据格式转换器
 
 [🇬🇧 English](./README.md)
 
@@ -175,7 +175,7 @@ WorkBuddy 对话示例：
 
 ### EpiData (.rec)
 **读入：**
-- ❌ 唯一读入路径为 R + `foreign` 包
+- ❌ 读入需经 R + `foreign` 包桥接（需显式 `allow_r_exec=True` 开启，默认禁用）
 - ❌ 统计元数据在 R → CSV 桥接过程中丢失
 
 ### EpiInfo (.prj)
@@ -247,12 +247,16 @@ WorkBuddy 对话示例：
 - ✅ 旧版 (pre-v13) Latin-1 编码已自动检测
 - ❌ Stata 117-119：pyreadstat 1.3.5 不支持，写回时自动降级为 version 15
 
-## 安全 | Security
+## 安全 / Security
 
-- **R 反序列化默认隔离 | R deserialization sandboxed**: `.rda/.rds/.RData` 文件用纯 Python 的 `pyreadr` 解析（无代码执行）。若 `pyreadr` 失败，技能会明确报错而非静默回退到 R 解释器。R 的 `readRDS()/load()` 加载不可信对象可能执行嵌入代码，因此 R 解释器回退**默认禁用**，仅当对可信文件显式传入 `allow_r_exec=True` 时运行。
-- **可选安装 | Optional install**: `python scripts/check_env.py --install` 仅在显式要求时运行。
-- **无破坏性写入 | No destructive writes**: 写入已存在的 `.hyper` 文件前，原文件先备份为 `<file>.bak`。
-- **范围 | Scope**: 仅统计数据格式。除非你显式要求安装包，否则不访问网络。
+- **R 执行默认隔离且需显式开启 / R execution opt-in & sandboxed**: 所有调用本地 R 解释器的路径——读入 `.rda/.rds/.RData`（`readRDS()/load()`）、读入 Minitab `.mtw/.mpj` 与 EpiData `.rec`（`foreign::read.mtb()/read.epiinfo()`）、写出 R 格式（`.rda/.rds`）——**默认禁用**。仅当对可信文件显式传入 `allow_r_exec=True` 时才会运行。纯 Python 解析器（`pyreadr`、`mtbpy`）优先使用，绝不执行代码。
+- **无静默 R 回退 / No silent R fallback**: 若纯 Python 解析失败且未设 `allow_r_exec`，技能会明确报错而非静默启动 R，从而消除对不可信文件执行嵌入代码的风险。
+- **R 脚本为静态模板 / R scripts are static templates**: 启用 R 路径时，所有 R 脚本均为完全静态模板；用户输入（文件路径、标签、元数据）仅经命令行参数（`commandArgs(trailingOnly=TRUE)` + `jsonlite`）传入，绝不拼进可执行 R 代码。临时文件名随机，无固定路径。
+- **临时 CSV 暴露（R 桥接）| Temporary CSV exposure (R bridge)**: 启用 R 时（opt-in），转换数据会先物化为磁盘临时 CSV 再读回。临时文件在用后即刻删除，但崩溃时或经备份/索引工具可能短暂留存。处理高度敏感数据请避开 R 桥接格式，或优先选用非 R 路径。
+- **无破坏性写入 / No destructive writes**: 写入已存在的 `.hyper` 文件时，新数据先写入临时文件；仅当写入成功后，原文件才轮转为 `<file>.bak`（上一份 `.bak` 降级为 `.bak.1`，绝不静默删除），随后临时文件原子替换入位。若写入失败，原文件保持不动。
+- **可选安装 / Optional install**: `python scripts/check_env.py --install` 仅在显式要求时运行。
+- **依赖已固定版本 / Pinned dependencies**: 核心依赖均带上限约束（`pandas`、`pyreadstat`、`pyreadr`），详见 `requirements.txt`。
+- **范围 / Scope**: 仅统计数据格式。除非你显式要求安装包，否则不访问网络。
 
 ## 许可证
 

@@ -1,4 +1,4 @@
-# statdata-transfer | Statistical Data Format Converter
+# statdata-transfer / Statistical Data Format Converter
 
 [🇨🇳 中文 (Chinese)](./README_ZH.md)
 
@@ -221,7 +221,7 @@ To add a new format: edit `scripts/reader_*.py` to add a reader function, regist
 
 ### R (.rda/.rds/.rdata)
 **Read:**
-- ✅ Old ASCII XDR (RDA2): **auto-fallback to R** (recommended)
+- ✅ Old ASCII XDR (RDA2): read via R bridge requires `allow_r_exec=True` (opt-in; not automatic)
 - ❌ Factor level order may not be preserved as Categorical unless embedded via `stat-full-meta`
 - ❌ Multi-object RDA: `read_all_r_objects()` returns all
 **Write:**
@@ -249,9 +249,13 @@ To add a new format: edit `scripts/reader_*.py` to add a reader function, regist
 
 ## Security
 
-- **R deserialization is sandboxed by default.** `.rda/.rds/.RData` files are read with the pure-Python `pyreadr` parser (no code execution). If `pyreadr` fails, the skill raises a clear error instead of silently falling back to the R interpreter. Loading untrusted objects via R's `readRDS()/load()` can execute embedded code, so the R-interpreter fallback is **disabled by default** and only runs when you explicitly pass `allow_r_exec=True` on a TRUSTED file.
+- **R execution is opt-in and sandboxed by default.** Every path that invokes the local R interpreter — reading `.rda/.rds/.RData` (via `readRDS()/load()`), reading Minitab `.mtw/.mpj` and EpiData `.rec` (via `foreign::read.mtb()/read.epiinfo()`), and writing R formats (`.rda/.rds`) — is **disabled by default**. It only runs when you explicitly pass `allow_r_exec=True` on a TRUSTED file. Pure-Python parsers (`pyreadr`, `mtbpy`) are tried first and never execute code.
+- **No silent R fallback.** If the pure-Python parser fails and `allow_r_exec` is not set, the skill raises a clear error instead of silently launching R. This removes the risk of executing embedded code from untrusted files.
+- **R scripts are static templates.** When the opt-in R path runs, all R scripts are fully static; user inputs (file paths, labels, metadata) are passed only as CLI args (`commandArgs(trailingOnly=TRUE)` via `jsonlite`) — never concatenated into executable R code. Random temp filenames; no fixed paths.
+- **Temporary CSV exposure (R bridge).** When R is used (opt-in), converted data is materialized to a temporary CSV on disk before being read back. The temp file is deleted immediately after use, but on crash or via backup/indexing tools it could briefly persist. Avoid processing highly sensitive data through R-backed formats, or prefer a non-R path.
+- **No destructive writes.** When writing a `.hyper` file that already exists, the new data is written to a temp file first; only after success is the existing file rotated to `<file>.bak` (the previous `.bak` is demoted to `.bak.1`, never silently deleted), then the temp file is atomically swapped in. If the write fails, the original file is left untouched.
 - **Optional package install.** `python scripts/check_env.py --install` runs only on explicit request.
-- **No destructive writes.** When writing a `.hyper` file that already exists, the existing file is backed up to `<file>.bak` before overwrite.
+- **Pinned dependencies.** Core dependencies carry upper-bound pins (`pandas`, `pyreadstat`, `pyreadr`) — see `requirements.txt`.
 - **Scope.** Statistical data formats only. No network access unless you explicitly request package installation.
 
 ## License
